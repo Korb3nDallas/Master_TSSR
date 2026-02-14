@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab AD & Sécurité - Niveau TSSR</title>
+    <style>
+        :root {
+            --bg: #1e1e1e;
+            --panel: #252526;
+            --border: #3e3e42;
+            --text: #cccccc;
+            --highlight: #0078d7;
+            --success: #107c10;
+            --warning: #d83b01;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* HEADER */
+        header { background: #2d2d30; padding: 10px 20px; border-bottom: 2px solid #0078d7; display:flex; justify-content:space-between; align-items:center; }
+        h1 { margin: 0; font-size: 1.1rem; font-weight: 600; color: #fff; }
+        .home-btn { text-decoration: none; background: #333; color: white; padding: 5px 12px; border-radius: 4px; font-size: 0.9rem; border: 1px solid #555; }
+        .home-btn:hover { background: var(--highlight); border-color: var(--highlight); }
+
+        /* TABS */
+        .tabs { display: flex; background: #2d2d30; border-bottom: 1px solid var(--border); }
+        .tab { padding: 10px 20px; cursor: pointer; color: #999; border-right: 1px solid var(--border); transition: 0.2s; font-size: 0.95rem; }
+        .tab:hover { background: #3e3e42; color: #fff; }
+        .tab.active { background: #1e1e1e; color: #fff; border-top: 2px solid var(--highlight); }
+
+        /* LAYOUT */
+        .content-area { flex: 1; display: none; overflow: hidden; }
+        .content-area.active { display: flex; }
+
+        /* AD VIEW */
+        .sidebar { width: 300px; background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 10px; }
+        .main-view { flex: 1; padding: 20px; overflow-y: auto; background: #1e1e1e; }
+
+        /* TREE NODE */
+        .node { margin-left: 15px; }
+        .node-label { cursor: pointer; padding: 2px 6px; display: flex; align-items: center; gap: 6px; border-radius: 2px; }
+        .node-label:hover { background: #3e3e42; }
+        .node-label.selected { background: #094771; color: white; }
+        .children { display: none; border-left: 1px solid #555; margin-left: 7px; }
+        .children.open { display: block; }
+        
+        /* ICONS */
+        .ico { font-style: normal; }
+        .ico-dom { color: #87cefa; }
+        .ico-ou { color: #f0e68c; }
+        .ico-user { color: #98fb98; }
+        .ico-grp { color: #dda0dd; }
+        .ico-pc { color: #d3d3d3; }
+
+        /* FORMS */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.9rem; }
+        input, select { width: 100%; padding: 8px; background: #333; border: 1px solid #555; color: white; border-radius: 3px; box-sizing: border-box; }
+        input:focus { border-color: var(--highlight); outline: none; }
+        .btn { padding: 8px 16px; border: none; border-radius: 3px; cursor: pointer; font-weight: 600; margin-right: 10px; }
+        .btn-primary { background: var(--highlight); color: white; }
+        .btn-primary:hover { background: #0063b1; }
+        .btn-success { background: var(--success); color: white; }
+
+        /* TABLES */
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 10px; }
+        th { text-align: left; padding: 8px; background: #252526; border-bottom: 1px solid #555; color: #aaa; }
+        td { padding: 8px; border-bottom: 1px solid #333; }
+        tr:hover { background: #2a2d2e; }
+
+        /* COURS STYLES */
+        .course-container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .course-card { background: #252526; padding: 20px; margin-bottom: 20px; border-left: 4px solid var(--highlight); border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .course-card h3 { margin-top: 0; color: var(--highlight); }
+        .citation { font-size: 0.8rem; color: #888; font-style: italic; margin-top: 10px; text-align: right; }
+        ul { padding-left: 20px; line-height: 1.6; }
+        strong { color: #fff; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🛠️ Admin Lab - TSSRE (AD, DHCP & Sécu)</h1>
+    <a href="index.html" class="home-btn">🏠 Accueil</a>
+</header>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('ad')">👤 Active Directory (ADUC)</div>
+    <div class="tab" onclick="switchTab('dhcp')">📡 Serveur DHCP</div>
+    <div class="tab" onclick="switchTab('cours')">📘 Cours Durcissement & Sécu</div>
+</div>
+
+<div id="ad" class="content-area active">
+    <div class="sidebar" id="adTree"></div>
+    <div class="main-view">
+        <h2 id="viewTitle" style="margin-top:0; border-bottom:1px solid #444; padding-bottom:10px;">Sélectionnez une OU</h2>
+        
+        <div id="adActions" style="margin-bottom:20px; display:none;">
+            <button class="btn btn-primary" onclick="showForm('user')">👤 Nouvel Utilisateur</button>
+            <button class="btn btn-success" onclick="showForm('ou')">📂 Nouvelle OU</button>
+        </div>
+
+        <div id="createForms" style="background:#2d2d30; padding:20px; border-radius:5px; display:none; border:1px solid #444;">
+            <h3 id="formTitle" style="margin-top:0">Création</h3>
+            
+            <div id="userForm" style="display:none;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                    <div class="form-group">
+                        <label>Prénom</label>
+                        <input type="text" id="uFname" oninput="genLogon()">
+                    </div>
+                    <div class="form-group">
+                        <label>Nom</label>
+                        <input type="text" id="uLname" oninput="genLogon()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Ouverture de session (sAMAccountName)</label>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <input type="text" id="uLogon" readonly style="background:#222; color:#aaa;">
+                        <span>@corp.local</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Mot de passe</label>
+                    <input type="password" placeholder="Complexité requise (Ex: P@ssw0rd12!)">
+                </div>
+                <button class="btn btn-primary" onclick="submitUser()">Créer l'utilisateur</button>
+            </div>
+
+            <div id="ouForm" style="display:none;">
+                <div class="form-group">
+                    <label>Nom de l'Unité d'Organisation</label>
+                    <input type="text" id="ouName">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" checked disabled> Protéger contre la suppression accidentelle
+                    </label>
+                </div>
+                <button class="btn btn-success" onclick="submitOU()">Créer l'OU</button>
+            </div>
+            
+            <button class="btn" style="background:#555; color:white; margin-top:10px;" onclick="hideForms()">Annuler</button>
+        </div>
+
+        <div id="listContent"></div>
+    </div>
+</div>
+
+<div id="dhcp" class="content-area">
+    <div class="sidebar">
+        <div class="node">
+            <div class="node-label">📂 DHCP Server (SRV-DC01)</div>
+            <div class="children open" style="margin-left:10px;">
+                <div class="node-label selected">IPv4</div>
+                <div class="node-label">IPv6</div>
+            </div>
+        </div>
+    </div>
+    <div class="main-view">
+        <h2 style="margin-top:0;">Gestion des Étendues (Scopes)</h2>
+        
+        <div style="background:#252526; padding:15px; margin-bottom:20px; border-radius:4px;">
+            <h3>➕ Nouvelle Étendue</h3>
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; align-items:end;">
+                <div class="form-group" style="margin:0">
+                    <label>Nom</label>
+                    <input type="text" id="dhcpName" placeholder="Ex: VLAN 10">
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label>Début Plage IP</label>
+                    <input type="text" id="dhcpStart" placeholder="192.168.10.10">
+                </div>
+                <div class="form-group" style="margin:0">
+                    <label>Fin Plage IP</label>
+                    <input type="text" id="dhcpEnd" placeholder="192.168.10.200">
+                </div>
+                <button class="btn btn-primary" onclick="addScope()">Ajouter</button>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Statut</th>
+                    <th>Nom de l'étendue</th>
+                    <th>Plage d'adresses</th>
+                    <th>Masque</th>
+                    <th>Durée du bail</th>
+                </tr>
+            </thead>
+            <tbody id="dhcpTable">
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="cours" class="content-area">
+    <div class="main-view" style="display:block;"> <div class="course-container">
+            <h1 style="border-bottom: 2px solid var(--highlight); padding-bottom:10px;">Cours : Durcissement & Stratégie AD</h1>
+            <p>Synthèse des concepts clés pour le niveau TSSRE, basée sur les documents fournis.</p>
+
+            <div class="course-card">
+                <h3>1. Modèle de Tiering (Cloisonnement)</h3>
+                <p>Pour éviter qu'un hacker ne prenne le contrôle total du domaine en compromettant un simple poste de travail, on sépare l'AD en niveaux étanches :</p>
+                <ul>
+                    <li><strong>Tier 0 (Critique) :</strong> Contrôleurs de Domaine, Admins du Domaine. <em>Règle : Ne se connectent JAMAIS sur des serveurs ou PC.</em></li>
+                    <li><strong>Tier 1 (Serveurs) :</strong> Serveurs d'application, Bases de données.</li>
+                    <li><strong>Tier 2 (Postes de travail) :</strong> PC Utilisateurs, Imprimantes. C'est la zone la plus vulnérable (Phishing).</li>
+                </ul>
+                <div class="citation">Source :</div>
+            </div>
+
+            <div class="course-card" style="border-color: var(--success);">
+                <h3>2. Gestion Sécurisée des Comptes</h3>
+                <ul>
+                    <li><strong>Moindre Privilège :</strong> Ne jamais utiliser un compte "Admin du Domaine" pour lire ses mails ou aller sur le web. Utiliser un compte standard pour le quotidien.</li>
+                    <li><strong>Protected Users :</strong> Placer les admins sensibles dans ce groupe pour forcer Kerberos et empêcher la mise en cache des mots de passe.</li>
+                    <li><strong>Mots de passe :</strong> 14 caractères minimum, complexité activée.</li>
+                </ul>
+                <div class="citation">Source :</div>
+            </div>
+
+            <div class="course-card" style="border-color: var(--warning);">
+                <h3>3. Durcissement via GPO</h3>
+                <p>Les paramètres essentiels à déployer :</p>
+                <ul>
+                    <li><strong>LAPS (Local Admin Password Solution) :</strong> Gère automatiquement un mot de passe différent pour le compte "Administrateur" local de chaque PC. Empêche le mouvement latéral.</li>
+                    <li><strong>Désactiver NTLM :</strong> Forcer l'utilisation de Kerberos (plus sécurisé).</li>
+                    <li><strong>SMB Signing :</strong> Signer les paquets SMB pour éviter les attaques "Man-in-the-Middle".</li>
+                    <li><strong>BitLocker :</strong> Chiffrer les disques durs des postes de travail (Tier 2) pour protéger les données en cas de vol.</li>
+                </ul>
+            </div>
+
+             <div class="course-card" style="border-color: #9b59b6;">
+                <h3>4. Audit & Surveillance</h3>
+                <p>Activer les logs pour détecter les intrusions :</p>
+                <ul>
+                    <li>Surveiller les <strong>Logon/Logoff</strong> (Event ID 4624/4625).</li>
+                    <li>Surveiller les modifications de groupes sensibles (Admin du domaine).</li>
+                    <li>Configurer une taille de journaux suffisante pour garder un historique.</li>
+                </ul>
+                <div class="citation">Source :</div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+/* =====================
+   DATA & STATE
+   ===================== */
+
+// Structure initiale AD (Basée sur le modèle T0/T1/T2 des docs)
+const adData = {
+    id: 'root', name: 'corp.local', type: 'dom', open: true,
+    children: [
+        {
+            id: 't0', name: '00_ADMIN_TIER0', type: 'ou',
+            children: [
+                { id: 't0_u1', name: 'Admin (Built-in)', type: 'user', desc: 'Compte Administrateur 500' },
+                { id: 't0_u2', name: 'adm-t0-alex', type: 'user', desc: 'Admin Domaine (Alex)' }
+            ]
+        },
+        {
+            id: 't1', name: '01_SERVEURS_TIER1', type: 'ou',
+            children: [
+                { id: 't1_g1', name: 'SRV_WEB_IIS', type: 'grp' },
+                { id: 't1_pc1', name: 'SRV-APP-01', type: 'pc' }
+            ]
+        },
+        {
+            id: 't2', name: '02_WORKSTATIONS_TIER2', type: 'ou',
+            children: [
+                { id: 't2_ou1', name: 'HR_HumanResources', type: 'ou', children: [] },
+                { id: 't2_ou2', name: 'IT_Developers', type: 'ou', children: [] },
+                { id: 't2_pc1', name: 'PC-HR-001', type: 'pc' }
+            ]
+        },
+        {
+            id: 'users', name: 'Utilisateurs', type: 'ou',
+            children: [
+                { id: 'u1', name: 'Jean DUPONT', login:'j.dupont', type: 'user', desc: 'Utilisateur Standard' },
+                { id: 'u2', name: 'Marie CURIE', login:'m.curie', type: 'user', desc: 'Utilisateur Standard' }
+            ]
+        }
+    ]
+};
+
+const dhcpScopes = [
+    { name: "VLAN 10 - SERVERS", start: "192.168.10.10", end: "192.168.10.250", mask: "255.255.255.0", lease: "8 Jours" },
+    { name: "VLAN 20 - WORKSTATIONS", start: "192.168.20.50", end: "192.168.20.200", mask: "255.255.255.0", lease: "24 Heures" },
+    { name: "VLAN 99 - GUESTS", start: "172.16.99.10", end: "172.16.99.50", mask: "255.255.255.0", lease: "2 Heures" }
+];
+
+let selectedNode = null;
+
+/* =====================
+   FUNCTIONS: AD
+   ===================== */
+
+function renderTree(node, container) {
+    const div = document.createElement('div');
+    div.className = 'node';
+
+    // Icon Selection
+    let icon = '📁';
+    let cssClass = 'ico-ou';
+    if(node.type === 'dom') { icon = '🌐'; cssClass = 'ico-dom'; }
+    if(node.type === 'user') { icon = '👤'; cssClass = 'ico-user'; }
+    if(node.type === 'pc') { icon = '💻'; cssClass = 'ico-pc'; }
+    if(node.type === 'grp') { icon = '👥'; cssClass = 'ico-grp'; }
+
+    // Toggle Arrow
+    const hasChildren = node.children && node.children.length > 0;
+    const arrow = (hasChildren || node.type === 'ou' || node.type === 'dom') ? (node.open ? '▼' : '▶') : '&nbsp;';
+
+    div.innerHTML = `
+        <div class="node-label" onclick="selectNode('${node.id}', this)">
+            <span style="font-size:0.7rem; width:15px; text-align:center;">${arrow}</span>
+            <span class="ico ${cssClass}">${icon}</span>
+            <span>${node.name}</span>
+        </div>
+    `;
+    container.appendChild(div);
+
+    if (hasChildren || (node.children && node.children.length === 0)) { // Render container even if empty for OUs
+        const childContainer = document.createElement('div');
+        childContainer.className = 'children' + (node.open ? ' open' : '');
+        childContainer.id = 'child-' + node.id;
+        
+        if(node.children) {
+            node.children.forEach(child => renderTree(child, childContainer));
+        }
+        container.appendChild(childContainer);
+
+        // Click event for arrow toggle
+        const label = div.querySelector('.node-label');
+        label.ondblclick = (e) => {
+            e.stopPropagation();
+            node.open = !node.open;
+            refreshTree(); // Brute force refresh for simplicity
+        };
+    }
+}
+
+function findNode(id, currentNode) {
+    if (currentNode.id === id) return currentNode;
+    if (currentNode.children) {
+        for (let child of currentNode.children) {
+            const found = findNode(id, child);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function selectNode(id, el) {
+    // UI Highlight
+    document.querySelectorAll('.node-label').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+
+    selectedNode = findNode(id, adData);
+    
+    // Update View
+    const title = document.getElementById('viewTitle');
+    const actions = document.getElementById('adActions');
+    const list = document.getElementById('listContent');
+    const forms = document.getElementById('createForms');
+    
+    forms.style.display = 'none'; // Hide forms on selection change
+    title.innerHTML = `<span class="ico ${selectedNode.type === 'dom' ? 'ico-dom' : 'ico-ou'}"></span> ${selectedNode.name}`;
+    
+    // Show contents list
+    let html = '';
+    if (selectedNode.children) {
+        html += `<table><thead><tr><th>Nom</th><th>Type</th><th>Description</th></tr></thead><tbody>`;
+        if(selectedNode.children.length === 0) {
+            html += `<tr><td colspan="3" style="text-align:center; color:#666;">Dossier vide</td></tr>`;
+        } else {
+            selectedNode.children.forEach(c => {
+                let typeTxt = c.type.toUpperCase();
+                let desc = c.desc || '-';
+                if(c.login) desc += ` (Logon: ${c.login})`;
+                html += `<tr>
+                    <td><strong>${c.name}</strong></td>
+                    <td>${typeTxt}</td>
+                    <td>${desc}</td>
+                </tr>`;
+            });
+        }
+        html += `</tbody></table>`;
+        actions.style.display = 'block'; // Allow creating inside
+    } else {
+        // It's a user or PC, show details
+        html = `<div style="padding:20px; background:#252526; border-radius:5px;">
+            <h3>Détails de l'objet</h3>
+            <p><strong>Nom :</strong> ${selectedNode.name}</p>
+            <p><strong>Type :</strong> ${selectedNode.type.toUpperCase()}</p>
+            <p><strong>Description :</strong> ${selectedNode.desc || 'Aucune'}</p>
+        </div>`;
+        actions.style.display = 'none';
+    }
+    list.innerHTML = html;
+}
+
+function refreshTree() {
+    const root = document.getElementById('adTree');
+    root.innerHTML = '';
+    renderTree(adData, root);
+}
+
+/* =====================
+   FUNCTIONS: FORMS
+   ===================== */
+
+function showForm(type) {
+    document.getElementById('createForms').style.display = 'block';
+    document.getElementById('userForm').style.display = 'none';
+    document.getElementById('ouForm').style.display = 'none';
+
+    if(type === 'user') {
+        document.getElementById('formTitle').innerText = "Nouvel Utilisateur";
+        document.getElementById('userForm').style.display = 'block';
+    } else {
+        document.getElementById('formTitle').innerText = "Nouvelle Unité d'Organisation (OU)";
+        document.getElementById('ouForm').style.display = 'block';
+    }
+}
+
+function hideForms() {
+    document.getElementById('createForms').style.display = 'none';
+    // Clear inputs
+    document.getElementById('uFname').value = '';
+    document.getElementById('uLname').value = '';
+    document.getElementById('uLogon').value = '';
+    document.getElementById('ouName').value = '';
+}
+
+function genLogon() {
+    const f = document.getElementById('uFname').value.toLowerCase().trim();
+    const l = document.getElementById('uLname').value.toLowerCase().trim();
+    if(f && l) {
+        // Format standard: p.nom (premier lettre prenom . nom)
+        document.getElementById('uLogon').value = `${f.charAt(0)}.${l}`;
+    }
+}
+
+function submitUser() {
+    const f = document.getElementById('uFname').value;
+    const l = document.getElementById('uLname').value;
+    const logon = document.getElementById('uLogon').value;
+    
+    if(!f || !l) return alert("Veuillez remplir les noms.");
+
+    const newUser = {
+        id: 'u_' + Date.now(),
+        name: `${f} ${l.toUpperCase()}`,
+        type: 'user',
+        login: logon,
+        desc: 'Utilisateur créé manuellement'
+    };
+
+    if(selectedNode && selectedNode.children) {
+        selectedNode.children.push(newUser);
+        selectedNode.open = true; // Open folder to show new item
+        refreshTree();
+        selectNode(selectedNode.id, document.querySelector('.selected') || document.body); // Refresh view
+        hideForms();
+    }
+}
+
+function submitOU() {
+    const name = document.getElementById('ouName').value;
+    if(!name) return alert("Nom requis.");
+
+    const newOU = {
+        id: 'ou_' + Date.now(),
+        name: name,
+        type: 'ou',
+        children: []
+    };
+
+    if(selectedNode && selectedNode.children) {
+        selectedNode.children.push(newOU);
+        selectedNode.open = true;
+        refreshTree();
+        selectNode(selectedNode.id, document.querySelector('.selected') || document.body);
+        hideForms();
+    }
+}
+
+/* =====================
+   FUNCTIONS: DHCP
+   ===================== */
+
+function renderDHCP() {
+    const tbody = document.getElementById('dhcpTable');
+    tbody.innerHTML = '';
+    
+    dhcpScopes.forEach(s => {
+        const row = `<tr>
+            <td style="color:#107c10">● Actif</td>
+            <td><strong>${s.name}</strong></td>
+            <td>${s.start} - ${s.end}</td>
+            <td>${s.mask}</td>
+            <td>${s.lease}</td>
+        </tr>`;
+        tbody.innerHTML += row;
+    });
+}
+
+function addScope() {
+    const name = document.getElementById('dhcpName').value;
+    const start = document.getElementById('dhcpStart').value;
+    const end = document.getElementById('dhcpEnd').value;
+    
+    if(!name || !start || !end) return alert("Tout remplir svp.");
+    
+    dhcpScopes.push({
+        name: name, start: start, end: end, mask: "255.255.255.0", lease: "8 Jours"
+    });
+    renderDHCP();
+    // Clear
+    document.getElementById('dhcpName').value = '';
+    document.getElementById('dhcpStart').value = '';
+    document.getElementById('dhcpEnd').value = '';
+}
+
+/* =====================
+   CORE & INIT
+   ===================== */
+
+function switchTab(id) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.content-area').forEach(c => c.classList.remove('active'));
+    
+    // Find index for tab active class
+    const tabs = ['ad', 'dhcp', 'cours'];
+    document.querySelectorAll('.tab')[tabs.indexOf(id)].classList.add('active');
+    document.getElementById(id).classList.add('active');
+}
+
+// Init
+refreshTree();
+renderDHCP();
+// Select root by default logic
+setTimeout(() => {
+    // Hack simple to select root visual
+    // selectNode('root', document.querySelector('.node-label')); 
+}, 100);
+
+</script>
+</body>
+</html>
