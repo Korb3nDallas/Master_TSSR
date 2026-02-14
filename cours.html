@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cours Interactif - Réseaux & TCP/IP</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #e2e8f0;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --terminal-bg: #0c0c0c;
+        }
+
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
+        
+        /* Navigation */
+        nav { background: #111827; padding: 1rem; border-bottom: 1px solid #374151; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .nav-container { max-width: 1000px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .logo { font-size: 1.5rem; font-weight: 800; background: linear-gradient(45deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .tabs { display: flex; gap: 10px; }
+        .tab-btn { background: transparent; border: 1px solid #374151; color: #9ca3af; padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+        .tab-btn:hover { background: rgba(59, 130, 246, 0.1); color: white; }
+        .tab-btn.active { background: var(--accent); border-color: var(--accent); color: white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+
+        /* Contenu Principal */
+        main { max-width: 1000px; margin: 2rem auto; padding: 0 1rem; flex-grow: 1; width: 100%; box-sizing: border-box; }
+        
+        .section { display: none; animation: fadeIn 0.4s ease; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h2 { border-left: 4px solid var(--accent); padding-left: 10px; margin-bottom: 20px; }
+
+        /* MODULE 1: OSI STACK */
+        .osi-container { display: flex; flex-direction: column; gap: 8px; max-width: 800px; margin: 0 auto; }
+        .osi-layer { 
+            background: var(--card-bg); border: 1px solid #334155; border-radius: 8px; overflow: hidden; 
+            transition: all 0.3s; cursor: pointer; position: relative;
+        }
+        .osi-layer:hover { transform: scale(1.01); border-color: var(--accent); }
+        .osi-header { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        .osi-num { background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 50%; font-size: 0.9rem; margin-right: 15px; }
+        .osi-content { 
+            max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out; background: rgba(0,0,0,0.2); 
+            padding: 0 20px; font-size: 0.95rem; color: #cbd5e1;
+        }
+        .osi-layer.open .osi-content { max-height: 200px; padding-bottom: 20px; border-top: 1px solid rgba(255,255,255,0.05); }
+        .tag { font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; margin-right: 5px; opacity: 0.8; }
+        .tag-pdu { background: #065f46; color: #6ee7b7; }
+        .tag-dev { background: #1e3a8a; color: #93c5fd; }
+
+        /* MODULE 2: PORTS GRID */
+        .grid-ports { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .port-card { 
+            background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid #334155; 
+            display: flex; flex-direction: column; align-items: center; text-align: center; transition: 0.2s;
+        }
+        .port-card:hover { transform: translateY(-5px); border-color: var(--success); box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
+        .port-num { font-size: 2rem; font-weight: bold; color: var(--accent); margin: 5px 0; }
+        .port-proto { font-weight: 600; color: #f8fafc; font-size: 1.1rem; }
+        .port-desc { font-size: 0.85rem; color: #94a3b8; margin-top: 5px; }
+        .filter-bar { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+        /* MODULE 3: TERMINAL */
+        .terminal-window { background: var(--terminal-bg); border-radius: 8px; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; font-family: 'Consolas', monospace; }
+        .terminal-header { background: #1f1f1f; padding: 8px 15px; display: flex; gap: 8px; border-bottom: 1px solid #333; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        .terminal-body { padding: 20px; min-height: 250px; color: #00ff00; }
+        .cmd-btn-container { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .cmd-btn { background: #1e293b; border: 1px solid #475569; color: #e2e8f0; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-family: monospace; }
+        .cmd-btn:hover { background: #334155; border-color: var(--accent); }
+        .typing::after { content: '▋'; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* MODULE 4: IP & DEFS */
+        .def-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .def-card { background: linear-gradient(145deg, #1e293b, #111827); padding: 20px; border-radius: 12px; border-left: 5px solid var(--accent); }
+        .def-title { font-weight: bold; font-size: 1.2rem; margin-bottom: 10px; color: white; }
+        .class-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        
+    </style>
+</head>
+<body>
+<a href="index.html" style="position:fixed; top:10px; right:10px; background:#333; color:white; padding:8px 15px; text-decoration:none; border-radius:5px; z-index:9999; font-family:sans-serif; font-size:12px;">🏠 Accueil</a>
+<nav>
+    <div class="nav-container">
+        <div class="logo">🚀 Réseau Master</div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('osi')">Modèle OSI</button>
+            <button class="tab-btn" onclick="switchTab('ports')">Ports & Services</button>
+            <button class="tab-btn" onclick="switchTab('cmds')">Commandes</button>
+            <button class="tab-btn" onclick="switchTab('ips')">Adressage IP</button>
+        </div>
+    </div>
+</nav>
+
+<main>
+    <div id="osi" class="section active">
+        <h2>Le Modèle OSI (7 Couches)</h2>
+        <p style="margin-bottom: 20px; color:#94a3b8;">Clique sur une couche pour voir les détails. Rappelle-toi : "Pour Le Réseau Tout Se Passe Automatiquement" (7 vers 1).</p>
+        
+        <div class="osi-container" id="osiStack">
+            </div>
+    </div>
+
+    <div id="ports" class="section">
+        <h2>Ports & Protocoles</h2>
+        <div class="filter-bar">
+            <button class="tab-btn active" onclick="filterPorts('all', this)">Tous</button>
+            <button class="tab-btn" onclick="filterPorts('web', this)">Web & Fichiers</button>
+            <button class="tab-btn" onclick="filterPorts('mail', this)">Emails</button>
+            <button class="tab-btn" onclick="filterPorts('infra', this)">Infrastructure</button>
+        </div>
+        <div class="grid-ports" id="portsGrid">
+            </div>
+    </div>
+
+    <div id="cmds" class="section">
+        <h2>Simulateur de Terminal</h2>
+        <p style="color:#94a3b8;">Clique sur une commande pour voir ce qu'elle fait réellement.</p>
+        
+        <div class="cmd-btn-container" id="cmdButtons">
+            </div>
+
+        <div class="terminal-window">
+            <div class="terminal-header">
+                <div class="dot" style="background:#ff5f56"></div>
+                <div class="dot" style="background:#ffbd2e"></div>
+                <div class="dot" style="background:#27c93f"></div>
+                <span style="margin-left:10px; font-size:12px; color:#999">admin@network-lab:~</span>
+            </div>
+            <div class="terminal-body" id="terminalOutput">
+                <div class="line">Bienvenue dans le simulateur réseau.</div>
+                <div class="line">Sélectionnez une commande ci-dessus pour commencer...<span class="typing"></span></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ips" class="section">
+        <h2>Adressage IP & Concepts</h2>
+        
+        <div class="def-grid">
+            <div class="def-card" style="border-color: #f59e0b;">
+                <div class="def-title">Classes IPv4</div>
+                <div class="class-row"><span>Classe A</span> <span style="color:#f59e0b">1.0.0.0 - 126.255.255.255</span></div>
+                <div class="class-row"><span>Classe B</span> <span style="color:#f59e0b">128.0.0.0 - 191.255.255.255</span></div>
+                <div class="class-row"><span>Classe C</span> <span style="color:#f59e0b">192.0.0.0 - 223.255.255.255</span></div>
+                <p style="font-size:0.8rem; margin-top:10px; color:#9ca3b8;">Note: 127.x.x.x est réservé pour le Loopback (localhost).</p>
+            </div>
+
+            <div class="def-card" style="border-color: #10b981;">
+                <div class="def-title">Adresses Privées (RFC 1918)</div>
+                <p>Ces adresses ne sont pas routables sur Internet (utilisées en LAN).</p>
+                <div class="class-row"><span>Classe A</span> <span>10.0.0.0 /8</span></div>
+                <div class="class-row"><span>Classe B</span> <span>172.16.0.0 /12</span></div>
+                <div class="class-row"><span>Classe C</span> <span>192.168.0.0 /16</span></div>
+            </div>
+
+            <div class="def-card" style="border-color: #ec4899;">
+                <div class="def-title">Différences Matérielles</div>
+                <p><strong>Hub :</strong> "Bête". Envoie les données à tout le monde (Broadcast). Couche 1.</p>
+                <p><strong>Switch :</strong> "Intelligent". Utilise l'adresse MAC pour envoyer au bon destinataire. Couche 2.</p>
+                <p><strong>Routeur :</strong> "Chef". Connecte différents réseaux (LAN/WAN) via IP. Couche 3.</p>
+            </div>
+            
+            <div class="def-card" style="border-color: #8b5cf6;">
+                <div class="def-title">TCP vs UDP</div>
+                <div style="margin-bottom:10px">
+                    <strong style="color:#8b5cf6">TCP (Fiable)</strong><br>
+                    Connexion établie (3-way handshake). Vérifie que les paquets arrivent. Plus lent.<br>
+                    <em>Ex: Web, Email, Fichiers.</em>
+                </div>
+                <div>
+                    <strong style="color:#8b5cf6">UDP (Rapide)</strong><br>
+                    Pas de connexion. "Fire and forget". Si un paquet est perdu, tant pis. Temps réel.<br>
+                    <em>Ex: Streaming, VoIP, DNS, Jeux en ligne.</em>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // --- DONNÉES ---
+    const osiLayers = [
+        { n:7, name:"Application", color:"#ec4899", pdu:"Donnée", dev:"PC / Proxy", desc:"Interface directe avec l'utilisateur (Navigateur, Client Mail)." },
+        { n:6, name:"Présentation", color:"#d946ef", pdu:"Donnée", dev:"Gateway", desc:"Traducteur. S'occupe du formatage, chiffrement (SSL/TLS) et compression." },
+        { n:5, name:"Session", color:"#a855f7", pdu:"Donnée", dev:"Gateway", desc:"Gendarme. Ouvre, gère et ferme les sessions entre applications." },
+        { n:4, name:"Transport", color:"#8b5cf6", pdu:"Segment", dev:"Firewall", desc:"Livreur. Choisit le protocole (TCP/UDP) et découpe les données. Gère les ports." },
+        { n:3, name:"Réseau", color:"#3b82f6", pdu:"Paquet", dev:"Routeur", desc:"GPS. Adressage IP logique et détermination du meilleur chemin (Routage)." },
+        { n:2, name:"Liaison", color:"#0ea5e9", pdu:"Trame", dev:"Switch", desc:"Contrôle Qualité. Adressage MAC physique et détection d'erreurs locales." },
+        { n:1, name:"Physique", color:"#06b6d4", pdu:"Bit", dev:"Câble / Hub", desc:"La Route. Transmission brute des 0 et 1 sous forme de signaux (électrique/optique)." }
+    ];
+
+    const portsData = [
+        { p:20, n:"FTP", d:"Transfert de fichiers (Data)", c:"web" },
+        { p:21, n:"FTP", d:"Transfert de fichiers (Commandes)", c:"web" },
+        { p:22, n:"SSH", d:"Connexion sécurisée à distance (Linux)", c:"infra" },
+        { p:23, n:"Telnet", d:"Connexion à distance non sécurisée (Obsolète)", c:"infra" },
+        { p:25, n:"SMTP", d:"Envoi d'emails (Poste)", c:"mail" },
+        { p:53, n:"DNS", d:"Traduit 'google.com' en IP", c:"infra" },
+        { p:67, n:"DHCP", d:"Distribue les IP automatiquement", c:"infra" },
+        { p:80, n:"HTTP", d:"Web non sécurisé", c:"web" },
+        { p:110, n:"POP3", d:"Réception d'emails (Télécharge tout)", c:"mail" },
+        { p:143, n:"IMAP", d:"Réception d'emails (Synchro serveur)", c:"mail" },
+        { p:443, n:"HTTPS", d:"Web sécurisé (Cadenas)", c:"web" },
+        { p:3389, n:"RDP", d:"Bureau à distance Windows", c:"infra" }
+    ];
+
+    const commands = [
+        { c:"ping 8.8.8.8", r:"Envoi de 4 paquets ICMP vers 8.8.8.8...\nRéponse de 8.8.8.8 : octets=32 temps=12ms TTL=115\n\n> Vérifie si une machine est joignable." },
+        { c:"ipconfig /all", r:"Configuration IP de Windows...\nAdresse IPv4. . . . . . . : 192.168.1.25\nMasque de sous-réseau . : 255.255.255.0\nPasserelle par défaut . : 192.168.1.1\nAdresse Physique (MAC)  : AB-CD-EF-12-34-56\n\n> Affiche TOUS les détails de la carte réseau." },
+        { c:"tracert google.com", r:"Détermination de l'itinéraire vers google.com...\n1    <1 ms    192.168.1.1 (Box)\n2    15 ms    80.12.xx.xx (FAI)\n3    18 ms    google-router.com\n\n> Affiche chaque saut (routeur) traversé par le paquet." },
+        { c:"nslookup youtube.com", r:"Serveur :  UnKnown\nAddress:  192.168.1.1\n\nRéponse ne faisant pas autorité :\nNom :    youtube.com\nAddresses:  142.250.75.238\n\n> Interroge le serveur DNS pour trouver l'IP d'un nom." },
+        { c:"netstat -an", r:"Connexions actives\n  Proto  Adresse locale    Adresse distante   État\n  TCP    192.168.1.25:54321  104.21.55.2:443    ESTABLISHED\n  TCP    0.0.0.0:80        0.0.0.0:0          LISTENING\n\n> Affiche tous les ports ouverts et connexions en cours." },
+        { c:"arp -a", r:"Interface : 192.168.1.25\n  Adresse Internet      Adresse physique      Type\n  192.168.1.1           a4-3e-5b-xx-xx-xx     dynamique\n  192.168.1.55          00-11-22-33-44-55     dynamique\n\n> Affiche la table de correspondance IP <-> MAC." }
+    ];
+
+    // --- LOGIQUE ---
+    
+    // 1. Init OSI
+    const osiStack = document.getElementById('osiStack');
+    osiLayers.forEach(l => {
+        const el = document.createElement('div');
+        el.className = 'osi-layer';
+        el.style.borderLeft = `6px solid ${l.color}`;
+        el.innerHTML = `
+            <div class="osi-header">
+                <span style="display:flex; align-items:center">
+                    <span class="osi-num" style="color:${l.color}">#${l.n}</span> ${l.name}
+                </span>
+                <span style="font-size:1.2rem; opacity:0.5">▼</span>
+            </div>
+            <div class="osi-content">
+                <p><strong>Rôle :</strong> ${l.desc}</p>
+                <div style="margin-top:10px">
+                    <span class="tag tag-pdu">PDU: ${l.pdu}</span>
+                    <span class="tag tag-dev">Matériel: ${l.dev}</span>
+                </div>
+            </div>
+        `;
+        el.onclick = () => {
+            el.classList.toggle('open');
+            const arrow = el.querySelector('.osi-header span:last-child');
+            arrow.innerText = el.classList.contains('open') ? '▲' : '▼';
+        };
+        osiStack.appendChild(el);
+    });
+
+    // 2. Init Ports
+    const portsGrid = document.getElementById('portsGrid');
+    function renderPorts(filter) {
+        portsGrid.innerHTML = "";
+        portsData.forEach(p => {
+            if(filter !== 'all' && p.c !== filter) return;
+            const card = document.createElement('div');
+            card.className = 'port-card';
+            card.innerHTML = `
+                <div class="port-proto">${p.n}</div>
+                <div class="port-num">${p.p}</div>
+                <div class="port-desc">${p.d}</div>
+            `;
+            portsGrid.appendChild(card);
+        });
+    }
+    renderPorts('all');
+
+    window.filterPorts = (cat, btn) => {
+        document.querySelectorAll('#ports .filter-bar .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderPorts(cat);
+    };
+
+    // 3. Init Commandes
+    const cmdContainer = document.getElementById('cmdButtons');
+    const terminal = document.getElementById('terminalOutput');
+    
+    commands.forEach(cmd => {
+        const btn = document.createElement('button');
+        btn.className = 'cmd-btn';
+        btn.innerText = "> " + cmd.c.split(' ')[0]; // Juste la commande
+        btn.onclick = () => runCmd(cmd);
+        cmdContainer.appendChild(btn);
+    });
+
+    function runCmd(cmdObj) {
+        terminal.innerHTML += `<div class="line" style="margin-top:10px; color:#fff">> ${cmdObj.c}</div>`;
+        terminal.scrollTop = terminal.scrollHeight;
+        
+        // Effet de délai pour simuler le calcul
+        setTimeout(() => {
+            terminal.innerHTML += `<div class="line" style="color:#ccc; white-space:pre-wrap;">${cmdObj.r}</div>`;
+            terminal.innerHTML += `<div class="line"><span class="typing"></span></div>`;
+            terminal.scrollTop = terminal.scrollHeight;
+        }, 400);
+    }
+
+    // 4. Navigation Tabs
+    window.switchTab = (tabId) => {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        
+        document.querySelectorAll('nav .tab-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+    };
+
+</script>
+</body>
+</html>

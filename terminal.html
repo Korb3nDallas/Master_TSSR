@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimuLab: Linux & PowerShell Training</title>
+    <style>
+        :root {
+            --linux-bg: #1e1e1e;
+            --linux-fg: #00ff00;
+            --win-bg: #012456;
+            --win-fg: #eeedf0;
+            --font: 'Consolas', 'Ubuntu Mono', 'Courier New', monospace;
+        }
+
+        body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: #0f172a; font-family: sans-serif; overflow: hidden; }
+
+        /* HEADER */
+        header { background: #111; color: #fff; padding: 10px 20px; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-weight: bold; font-size: 1.2rem; background: linear-gradient(90deg, #22c55e, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .help-tip { font-size: 0.85rem; color: #888; }
+
+        /* SPLIT SCREEN */
+        .container { display: flex; flex: 1; height: 100%; }
+        
+        .terminal-wrapper { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #444; position: relative; }
+        .terminal-header { padding: 8px 15px; font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; }
+        
+        /* LINUX STYLE */
+        .linux-wrapper { background: var(--linux-bg); }
+        .linux-header { background: #2d2d2d; color: #ccc; border-bottom: 1px solid #444; }
+        .linux-term { flex: 1; padding: 15px; overflow-y: auto; font-family: var(--font); font-size: 14px; color: #ddd; }
+        .linux-prompt { color: #87d700; font-weight: bold; }
+        .linux-path { color: #3b82f6; font-weight: bold; }
+
+        /* WINDOWS STYLE */
+        .win-wrapper { background: var(--win-bg); border-right: none; }
+        .win-header { background: #fff; color: #000; border-bottom: 1px solid #ccc; }
+        .win-term { flex: 1; padding: 15px; overflow-y: auto; font-family: var(--font); font-size: 14px; color: var(--win-fg); }
+        .win-prompt { color: #fff; }
+
+        /* INPUT AREA */
+        .input-line { display: flex; margin-top: 5px; }
+        input { background: transparent; border: none; outline: none; flex: 1; font-family: inherit; font-size: inherit; color: inherit; padding-left: 8px; }
+
+        /* UTILS */
+        .output { white-space: pre-wrap; line-height: 1.4; margin-bottom: 5px; }
+        .cursor { display: inline-block; width: 8px; height: 15px; background: currentColor; animation: blink 1s infinite; vertical-align: middle; }
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        /* SCROLLBARS */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 5px; }
+
+        .progress-bar { color: inherit; }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .info { color: #60a5fa; }
+    </style>
+</head>
+<body>
+<a href="index.html" style="position:fixed; top:10px; right:10px; background:#333; color:white; padding:8px 15px; text-decoration:none; border-radius:5px; z-index:9999; font-family:sans-serif; font-size:12px;">🏠 Accueil</a>
+<header>
+    <div class="logo">⚡ SimuLab Interactif</div>
+    <div class="help-tip">Tapez <b>help</b> dans un terminal pour voir les commandes disponibles.</div>
+</header>
+
+<div class="container">
+    <div class="terminal-wrapper linux-wrapper" onclick="focusInput('linux')">
+        <div class="terminal-header linux-header">
+            <span>🟠 Ubuntu 22.04 LTS (Bash)</span>
+        </div>
+        <div class="linux-term" id="linuxOutput">
+            <div class="output">Welcome to Ubuntu 22.04.2 LTS (GNU/Linux 5.15.0-60-generic x86_64)</div>
+            <div class="output" style="color:#888"> * Documentation:  https://help.ubuntu.com</div>
+            <div class="output" style="color:#888"> * Management:     https://landscape.canonical.com</div>
+            <br>
+            <div class="output">0 updates can be applied immediately.</div>
+            <br>
+        </div>
+        <div class="input-line" style="padding: 0 15px 15px 15px;">
+            <span class="linux-prompt">root@server</span>:<span class="linux-path">~</span>#
+            <input type="text" id="linuxInput" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+
+    <div class="terminal-wrapper win-wrapper" onclick="focusInput('win')">
+        <div class="terminal-header win-header">
+            <span>🔵 Windows PowerShell Administrator</span>
+        </div>
+        <div class="win-term" id="winOutput">
+            <div class="output">Windows PowerShell</div>
+            <div class="output">Copyright (C) Microsoft Corporation. All rights reserved.</div>
+            <br>
+            <div class="output">Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows</div>
+            <br>
+        </div>
+        <div class="input-line" style="padding: 0 15px 15px 15px;">
+            <span class="win-prompt">PS C:\Users\Admin></span>
+            <input type="text" id="winInput" autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+</div>
+
+<script>
+/* =========================================
+   CORE SYSTEM (FILE SYSTEM & STATE)
+   ========================================= */
+
+const state = {
+    linux: {
+        path: ['home', 'user'],
+        fs: {
+            'home': { type: 'dir', content: { 'user': { type: 'dir', content: {} } } },
+            'etc': { type: 'dir', content: { 'hosts': { type: 'file' } } },
+            'var': { type: 'dir', content: { 'www': { type: 'dir', content: { 'html': {type:'dir', content:{}} } } } }
+        },
+        installed: [],
+        services: { apache2: 'stopped', mysql: 'stopped' },
+        history: [],
+        histIndex: -1
+    },
+    win: {
+        path: ['C:', 'Users', 'Admin'],
+        fs: {
+            'Users': { type: 'dir', content: { 'Admin': { type: 'dir', content: { 'Documents':{type:'dir',c:{}}, 'Downloads':{type:'dir',c:{}} } } } },
+            'Windows': { type: 'dir', content: { 'System32': { type: 'dir', content: {} } } }
+        },
+        installed: [],
+        services: { W3SVC: 'Stopped' }, // IIS
+        history: [],
+        histIndex: -1
+    }
+};
+
+/* =========================================
+   LINUX LOGIC
+   ========================================= */
+
+const linuxCmds = {
+    'help': () => `Commandes disponibles:
+  <span class="info">Fichiers:</span> ls, cd, mkdir, touch, rm, cat, pwd, nano
+  <span class="info">Système:</span> apt-get, apt, service, systemctl, clear, whoami
+  <span class="info">Réseau:</span> ip a, ping, ifconfig
+  <span class="info">Exercice:</span> Essayez 'apt-get install apache2' ou 'php'`,
+    
+    'ls': (args) => {
+        const currentDir = getDir('linux');
+        if (Object.keys(currentDir).length === 0) return '(directory is empty)';
+        return Object.keys(currentDir).map(k => {
+            return currentDir[k].type === 'dir' ? `<span style="color:#3b82f6">${k}/</span>` : k;
+        }).join('  ');
+    },
+
+    'pwd': () => '/' + state.linux.path.join('/'),
+    
+    'whoami': () => 'root',
+
+    'cd': (args) => {
+        if (!args[0] || args[0] === '~') { state.linux.path = ['home', 'user']; return ''; }
+        if (args[0] === '..') { if (state.linux.path.length > 0) state.linux.path.pop(); return ''; }
+        if (args[0] === '/') { state.linux.path = []; return ''; }
+        
+        const current = getDir('linux');
+        if (current[args[0]] && current[args[0]].type === 'dir') {
+            state.linux.path.push(args[0]);
+            return '';
+        }
+        return `bash: cd: ${args[0]}: No such file or directory`;
+    },
+
+    'mkdir': (args) => {
+        if (!args[0]) return 'mkdir: missing operand';
+        getDir('linux')[args[0]] = { type: 'dir', content: {} };
+        return '';
+    },
+
+    'touch': (args) => {
+        if (!args[0]) return 'touch: missing file operand';
+        getDir('linux')[args[0]] = { type: 'file' };
+        return '';
+    },
+    
+    'rm': (args) => {
+        if(!args[0]) return 'rm: missing operand';
+        const dir = getDir('linux');
+        if(dir[args[0]]) { delete dir[args[0]]; return ''; }
+        return `rm: cannot remove '${args[0]}': No such file or directory`;
+    },
+
+    'apt-get': async (args, print) => runApt(args, print),
+    'apt': async (args, print) => runApt(args, print),
+    
+    'service': (args) => {
+        if(args[0] === 'apache2') {
+            if(!state.linux.installed.includes('apache2')) return `apache2: unrecognized service`;
+            if(args[1] === 'start') { state.linux.services.apache2 = 'running'; return ' * Starting Apache httpd web server apache2...   [ OK ]'; }
+            if(args[1] === 'stop') { state.linux.services.apache2 = 'stopped'; return ' * Stopping Apache httpd web server apache2...   [ OK ]'; }
+            if(args[1] === 'status') return `apache2 is ${state.linux.services.apache2}`;
+        }
+        return `Usage: service <name> <start|stop|status>`;
+    },
+
+    'systemctl': (args) => {
+         // Alias vers service pour la simu
+         return linuxCmds['service']([args[1], args[0]]); // Inversion args (start apache2 vs apache2 start)
+    },
+
+    'ping': async (args, print) => {
+        if(!args[0]) return 'Usage: ping <host>';
+        print(`PING ${args[0]} (${args[0]}) 56(84) bytes of data.`);
+        for(let i=1; i<=4; i++) {
+            await delay(800);
+            print(`64 bytes from ${args[0]}: icmp_seq=${i} ttl=54 time=${Math.floor(Math.random()*20+10)} ms`);
+        }
+        return `--- ${args[0]} ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss`;
+    },
+
+    'ip': (args) => {
+        if(args[0] === 'a' || args[0] === 'addr') return `1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536
+    inet 127.0.0.1/8 scope host lo
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
+    inet 192.168.1.50/24 brd 192.168.1.255 scope global eth0`;
+        return 'Usage: ip a';
+    },
+
+    'php': (args) => {
+        if(args[0] === '-v') {
+            if(state.linux.installed.includes('php')) return `PHP 8.1.2 (cli) (built: Feb 22 2023)\nZend Engine v4.1.2, Copyright (c) Zend Technologies`;
+            return `Command 'php' not found, but can be installed with:\napt install php-cli`;
+        }
+        return '';
+    },
+    
+    'nano': (args) => {
+        return "GNU nano 6.2\n\n[ Simulation: Éditeur ouvert. Tapez 'exit' pour fermer ]";
+    }
+};
+
+/* =========================================
+   WINDOWS LOGIC
+   ========================================= */
+
+const winCmds = {
+    'help': () => `Commandes disponibles:
+  <span class="info">Fichiers:</span> ls, dir, cd, mkdir, ni, rm, type
+  <span class="info">Système:</span> choco, Install-Package, Get-Service
+  <span class="info">Réseau:</span> ping, ipconfig, nslookup
+  <span class="info">Exercice:</span> 'choco install php' ou 'Install-WindowsFeature Web-Server'`,
+
+    'ls': () => winCmds['dir'](),
+    'dir': () => {
+        const currentDir = getDir('win');
+        let out = `    Directory: ${state.win.path.join('\\')}\n\nMode                 LastWriteTime         Length Name\n----                 -------------         ------ ----\n`;
+        if (Object.keys(currentDir).length === 0) return out;
+        Object.keys(currentDir).forEach(k => {
+            const isDir = currentDir[k].type === 'dir';
+            out += `${isDir ? 'd-----' : '-a----'}        ${new Date().toLocaleTimeString()}                ${k}\n`;
+        });
+        return out;
+    },
+
+    'cd': (args) => {
+        if (!args[0]) return '';
+        if (args[0] === '..') { if (state.win.path.length > 1) state.win.path.pop(); return ''; }
+        if (args[0] === '\\') { state.win.path = ['C:']; return ''; }
+        
+        const current = getDir('win');
+        if (current[args[0]] && current[args[0]].type === 'dir') {
+            state.win.path.push(args[0]);
+            return '';
+        }
+        return `cd : Cannot find path '${args[0]}' because it does not exist.`;
+    },
+
+    'mkdir': (args) => {
+        if (!args[0]) return '';
+        getDir('win')[args[0]] = { type: 'dir', content: {} };
+        return `    Directory: ${state.win.path.join('\\')}\n\nMode                 LastWriteTime         Length Name\n----                 -------------         ------ ----\nd-----        ${new Date().toLocaleTimeString()}                ${args[0]}`;
+    },
+
+    'ni': (args) => { // New-Item
+        if(!args[0]) return '';
+        getDir('win')[args[0]] = { type: 'file' };
+        return `    Directory: ${state.win.path.join('\\')}\n\nMode                 LastWriteTime         Length Name\n----                 -------------         ------ ----\n-a----        ${new Date().toLocaleTimeString()}           0  ${args[0]}`;
+    },
+
+    'ipconfig': () => `
+Windows IP Configuration
+
+Ethernet adapter Ethernet0:
+
+   Connection-specific DNS Suffix  . : localdomain
+   IPv4 Address. . . . . . . . . . . : 192.168.1.100
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 192.168.1.1`,
+
+    'ping': linuxCmds['ping'], // Reuse logic
+
+    'choco': async (args, print) => {
+        if(args[0] === 'install') {
+            const pkg = args[1];
+            if(!pkg) return 'Chocolatey v1.2.0\nPlease specify a package.';
+            if(state.win.installed.includes(pkg)) return `${pkg} v8.1.0 already installed.`;
+            
+            print(`Chocolatey v1.2.0\nInstalling the following packages:\n${pkg}\nBy installing you accept licenses for the packages.`);
+            await delay(1000);
+            print(`[${pkg}] Downloading... 100%`);
+            await delay(800);
+            print(`[${pkg}] Installing...`);
+            await delay(1000);
+            print(`\n${pkg} v8.1.0 has been successfully installed.`);
+            state.win.installed.push(pkg);
+            return '';
+        }
+        return 'Chocolatey v1.2.0';
+    },
+
+    'install-windowsfeature': async (args, print) => {
+        if(args[0] && args[0].toLowerCase() === 'web-server') {
+            print(`Success Restart Needed Exit Code      Feature Result\n------- -------------- ---------      --------------`);
+            await delay(500);
+            print(`[oooooooooooooooooooooooooooooooooooooooo] 10%`);
+            await delay(1000);
+            print(`[oooooooooooooooooooooooooooooooooooooooo] 100%`);
+            state.win.services.W3SVC = 'Running';
+            state.win.installed.push('iis');
+            return `True    No             Success        {Web Server (IIS)}`;
+        }
+        return 'Usage: Install-WindowsFeature <name>';
+    },
+    
+    'get-service': (args) => {
+        if(args[0] === 'W3SVC' || args[0] === 'IIS') {
+             return `Status   Name               DisplayName\n------   ----               -----------\n${state.win.services.W3SVC}  W3SVC              World Wide Web Publishing Service`;
+        }
+        return 'Stopped  W3SVC              World Wide Web Publishing Service';
+    }
+};
+
+
+/* =========================================
+   SIMULATION ENGINE
+   ========================================= */
+
+function getDir(os) {
+    let current = state[os].fs;
+    // Simple traversal. In a real app, this would need recursion for deep paths.
+    // For this simulation, we assume flat structure or simple depth for demo.
+    // Hack: We use the path array to drill down.
+    if(os === 'linux') {
+        if(state.linux.path.length === 0) return current; // root
+        try {
+            // Simplified: just return current node for demo if complicated
+            // Let's implement basic drilling
+            let node = current;
+            for(let p of state.linux.path) {
+                if(node[p] && node[p].content) node = node[p].content;
+                else if(p === 'home') node = node['home'].content; // quick fix
+            }
+            return node;
+        } catch(e) { return current; }
+    }
+    
+    if(os === 'win') {
+         // Similar logic for windows
+         let node = current;
+         // Skip "C:"
+         for(let i=1; i<state.win.path.length; i++) {
+             let p = state.win.path[i];
+             if(node[p] && node[p].content) node = node[p].content;
+         }
+         return node;
+    }
+}
+
+async function runApt(args, print) {
+    if(args[0] === 'update') {
+        print(`Hit:1 http://fr.archive.ubuntu.com/ubuntu jammy InRelease`);
+        print(`Get:2 http://fr.archive.ubuntu.com/ubuntu jammy-updates InRelease [114 kB]`);
+        print(`Get:3 http://security.ubuntu.com/ubuntu jammy-security InRelease [110 kB]`);
+        await delay(800);
+        print(`Fetched 224 kB in 1s (200 kB/s)`);
+        return `Reading package lists... Done`;
+    }
+    if(args[0] === 'install') {
+        const pkg = args[1];
+        if(!pkg) return 'E: Nothng to install';
+        if(state.linux.installed.includes(pkg)) return `${pkg} is already the newest version.`;
+        
+        print(`Reading package lists... Done\nBuilding dependency tree... Done\nThe following NEW packages will be installed:\n  ${pkg} ${pkg}-common lib-${pkg}`);
+        print(`0 upgraded, 3 newly installed, 0 to remove.`);
+        print(`Need to get 4,500 kB of archives.`);
+        await delay(1000);
+        print(`Get:1 http://fr.archive.ubuntu.com/ubuntu jammy/main amd64 ${pkg} [4,500 kB]`);
+        await delay(500);
+        print(`Selecting previously unselected package ${pkg}.`);
+        print(`(Reading database ... 14500 files and directories currently installed.)`);
+        print(`Preparing to unpack .../${pkg} ...`);
+        print(`Unpacking ${pkg} ...`);
+        await delay(800);
+        print(`Setting up ${pkg} ...`);
+        if(pkg === 'apache2' || pkg === 'httpd') {
+            print(`Created symlink /etc/systemd/system/multi-user.target.wants/apache2.service.`);
+            state.linux.installed.push('apache2');
+        } else if (pkg === 'php') {
+            state.linux.installed.push('php');
+        } else {
+            state.linux.installed.push(pkg);
+        }
+        return '';
+    }
+    return 'apt: usage: apt install <package>';
+}
+
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+/* =========================================
+   INPUT HANDLING
+   ========================================= */
+
+function focusInput(type) {
+    document.getElementById(type + 'Input').focus();
+}
+
+async function handleCommand(type, cmdStr) {
+    const inputEl = document.getElementById(type + 'Input');
+    const outputEl = document.getElementById(type + 'Output');
+    
+    // Echo command
+    const prompt = type === 'linux' 
+        ? `<span class="linux-prompt">root@server</span>:<span class="linux-path">${state.linux.path.length ? state.linux.path[state.linux.path.length-1] : '/'}</span>#`
+        : `<span class="win-prompt">PS ${state.win.path.join('\\')}></span>`;
+        
+    outputEl.innerHTML += `<div>${prompt} ${cmdStr}</div>`;
+    
+    if(!cmdStr.trim()) { inputEl.scrollIntoView(); return; }
+
+    // History
+    state[type].history.push(cmdStr);
+    state[type].histIndex = state[type].history.length;
+
+    const parts = cmdStr.trim().split(' ');
+    const cmd = parts[0].toLowerCase();
+    const args = parts.slice(1);
+    
+    const print = (text) => {
+        const d = document.createElement('div');
+        d.className = 'output';
+        d.innerText = text; // Safe text
+        outputEl.appendChild(d);
+        outputEl.scrollTop = outputEl.scrollHeight;
+    };
+
+    if(cmd === 'clear' || cmd === 'cls') {
+        outputEl.innerHTML = '';
+        return;
+    }
+
+    let result = '';
+    const cmdMap = type === 'linux' ? linuxCmds : winCmds;
+
+    if (cmdMap[cmd]) {
+        try {
+            // Some commands are async (apt, ping)
+            const res = cmdMap[cmd](args, print);
+            if(res instanceof Promise) result = await res;
+            else result = res;
+        } catch(e) {
+            result = `Error executing ${cmd}: ${e.message}`;
+        }
+    } else {
+        result = `${cmd}: command not found`;
+        if(type === 'win') result = `${cmd} : The term '${cmd}' is not recognized.`;
+    }
+
+    if(result) {
+        const resDiv = document.createElement('div');
+        resDiv.className = 'output';
+        resDiv.innerHTML = result; // Allows HTML color
+        outputEl.appendChild(resDiv);
+    }
+    
+    outputEl.scrollTop = outputEl.scrollHeight;
+    
+    // Update prompts (path change)
+    if(type === 'linux') {
+         const p = state.linux.path.length === 0 ? '/' : (state.linux.path[0] === 'home' ? '~' : state.linux.path[state.linux.path.length-1]);
+         document.querySelector('.linux-path').innerText = p;
+    } else {
+         document.querySelector('.win-prompt').innerText = `PS ${state.win.path.join('\\')}>`;
+    }
+}
+
+// Event Listeners
+['linux', 'win'].forEach(type => {
+    const input = document.getElementById(type + 'Input');
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            handleCommand(type, input.value);
+            input.value = '';
+        } else if (e.key === 'ArrowUp') {
+            const h = state[type].history;
+            let i = state[type].histIndex;
+            if(i > 0) {
+                state[type].histIndex--;
+                input.value = h[state[type].histIndex];
+            }
+        } else if (e.key === 'ArrowDown') {
+            const h = state[type].history;
+            let i = state[type].histIndex;
+            if(i < h.length - 1) {
+                state[type].histIndex++;
+                input.value = h[state[type].histIndex];
+            } else {
+                state[type].histIndex = h.length;
+                input.value = '';
+            }
+        }
+    });
+});
+
+// Auto focus linux on load
+focusInput('linux');
+
+</script>
+</body>
+</html>

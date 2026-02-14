@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QCM Réseau Ultimate — 200+ Questions</title>
+  <style>
+    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; background:#0f172a; color:#e2e8f0; }
+    header { padding: 15px 20px; background: #1e293b; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    h1 { margin: 0; font-size: 1.2rem; color: #60a5fa; }
+    .stats-row { display:flex; gap:10px; margin-top:8px; font-size:0.9rem; color:#94a3b8; flex-wrap: wrap;}
+    .stat-pill { background: #334155; padding: 4px 10px; border-radius: 99px; display:flex; align-items:center; gap:6px; }
+    
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .card { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); }
+    .question-text { font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; color: #f1f5f9; }
+    
+    .options { display: grid; gap: 10px; }
+    .option-label { display: flex; align-items: center; padding: 12px 16px; background: #0f172a; border: 2px solid #334155; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .option-label:hover { border-color: #60a5fa; background: #1e293b; }
+    .option-label input { margin-right: 12px; transform: scale(1.2); }
+    
+    /* Couleurs de correction */
+    .correct-answer { border-color: #10b981 !important; background: rgba(16, 185, 129, 0.1) !important; }
+    .wrong-answer { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; opacity: 0.7; }
+    
+    .explanation { margin-top: 15px; padding: 12px; background: #334155; border-radius: 8px; font-size: 0.95rem; line-height: 1.5; border-left: 4px solid #60a5fa; display: none; }
+    
+    .nav-bar { display:flex; justify-content:space-between; margin-top:30px; gap:10px; }
+    button { background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #475569; cursor: not-allowed; opacity: 0.7; }
+    button.finish { background: #059669; }
+    button.finish:hover { background: #047857; }
+    
+    .score-box { text-align:center; padding:30px; background:#1e293b; border-radius:16px; border:1px solid #334155; margin-bottom:20px; display:none; }
+    .score-val { font-size:3rem; font-weight:bold; color:#60a5fa; display:block; margin:10px 0; }
+  </style>
+</head>
+<body>
+<a href="index.html" style="position:fixed; top:10px; right:10px; background:#333; color:white; padding:8px 15px; text-decoration:none; border-radius:5px; z-index:9999; font-family:sans-serif; font-size:12px;">🏠 Accueil</a>
+<header>
+  <h1>⚡ QCM Réseau Ultimate</h1>
+  <div class="stats-row">
+    <span class="stat-pill">📋 <span id="lblTotal">0</span> Questions</span>
+    <span class="stat-pill">📄 Page <span id="lblPage">1</span></span>
+    <span class="stat-pill">✅ Score: <span id="lblScore">-</span></span>
+  </div>
+</header>
+
+<div class="container">
+  <div id="scorePanel" class="score-box"></div>
+  <div id="quizContainer"></div>
+  
+  <div class="nav-bar">
+    <button id="btnPrev" onclick="movePage(-1)">Précédent</button>
+    <div style="flex-grow:1"></div> <button id="btnFinish" class="finish" onclick="finishQuiz()">Terminer & Corriger</button>
+    <button id="btnNext" onclick="movePage(1)">Suivant</button>
+  </div>
+</div>
+
+<script>
+/* =========================================
+   BASE DE DONNÉES ÉTENDUE (La source)
+   ========================================= */
+
+const LAYERS = [
+  { n:1, name:"Physique", pdu:"Bit", dev:"Hub, Répéteur, Câble, Carte Réseau (NIC)", kw:"Signaux électriques, binaire, RJ45" },
+  { n:2, name:"Liaison de données", pdu:"Trame", dev:"Switch, Pont (Bridge)", kw:"Adresse MAC, LLC, VLAN, 802.1Q" },
+  { n:3, name:"Réseau", pdu:"Paquet", dev:"Routeur, Switch L3", kw:"Adresse IP, Routage, ICMP" },
+  { n:4, name:"Transport", pdu:"Segment (TCP) / Datagramme (UDP)", dev:"Firewall, Load Balancer", kw:"TCP, UDP, Ports, Contrôle de flux" },
+  { n:5, name:"Session", pdu:"Donnée", dev:"Gateway", kw:"Dialogues, RPC, NetBIOS, Tokens" },
+  { n:6, name:"Présentation", pdu:"Donnée", dev:"Gateway", kw:"Encodage, Chiffrement (TLS), Compression, ASCII/JPEG" },
+  { n:7, name:"Application", pdu:"Donnée", dev:"Proxy, Navigateur, Serveur", kw:"HTTP, FTP, SMTP, DNS, Interface utilisateur" }
+];
+
+// Liste massive de ports pour générer plein de questions
+const PORTS = [
+  { p:20, prot:"FTP-Data", t:"TCP" }, { p:21, prot:"FTP-Control", t:"TCP" },
+  { p:22, prot:"SSH", t:"TCP" }, { p:23, prot:"Telnet", t:"TCP" },
+  { p:25, prot:"SMTP", t:"TCP" }, { p:53, prot:"DNS", t:"UDP/TCP" },
+  { p:67, prot:"DHCP (Serveur)", t:"UDP" }, { p:68, prot:"DHCP (Client)", t:"UDP" },
+  { p:69, prot:"TFTP", t:"UDP" }, { p:80, prot:"HTTP", t:"TCP" },
+  { p:110, prot:"POP3", t:"TCP" }, { p:123, prot:"NTP", t:"UDP" },
+  { p:137, prot:"NetBIOS Name", t:"UDP" }, { p:139, prot:"NetBIOS Session", t:"TCP" },
+  { p:143, prot:"IMAP", t:"TCP" }, { p:161, prot:"SNMP", t:"UDP" },
+  { p:389, prot:"LDAP", t:"TCP" }, { p:443, prot:"HTTPS", t:"TCP" },
+  { p:445, prot:"SMB", t:"TCP" }, { p:514, prot:"Syslog", t:"UDP" },
+  { p:636, prot:"LDAPS", t:"TCP" }, { p:993, prot:"IMAPS", t:"TCP" },
+  { p:995, prot:"POP3S", t:"TCP" }, { p:1433, prot:"SQL Server", t:"TCP" },
+  { p:1723, prot:"PPTP", t:"TCP" }, { p:3306, prot:"MySQL", t:"TCP" },
+  { p:3389, prot:"RDP", t:"TCP" }, { p:5060, prot:"SIP", t:"UDP/TCP" },
+  { p:8080, prot:"HTTP-Alt", t:"TCP" }
+];
+
+const DEFINITIONS = [
+  { term:"ARP", def:"Résout une adresse IP en adresse MAC." },
+  { term:"RARP", def:"Résout une adresse MAC en adresse IP (obsolète)." },
+  { term:"DNS", def:"Traduit un nom de domaine (FQDN) en adresse IP." },
+  { term:"DHCP", def:"Attribue automatiquement IP, masque, passerelle et DNS." },
+  { term:"NAT", def:"Traduit les adresses IP privées en adresse publique pour aller sur Internet." },
+  { term:"ICMP", def:"Utilisé pour le diagnostic (Ping) et le signalement d'erreurs." },
+  { term:"TTL", def:"Empêche les paquets de boucler indéfiniment (Time To Live)." },
+  { term:"MTU", def:"Taille maximale d'un paquet pouvant être transmis (ex: 1500 octets)." },
+  { term:"VLAN", def:"Segmente logiquement un réseau physique au niveau 2." },
+  { term:"3-Way Handshake", def:"SYN, SYN-ACK, ACK (Établissement connexion TCP)." },
+  { term:"Full-Duplex", def:"Transmission de données dans les deux sens simultanément." },
+  { term:"Half-Duplex", def:"Transmission dans les deux sens, mais pas en même temps." },
+  { term:"Loopback", def:"Adresse 127.0.0.1 utilisée pour tester la pile IP locale." },
+  { term:"Broadcast", def:"Envoi de données à tous les hôtes du réseau." },
+  { term:"Multicast", def:"Envoi de données à un groupe spécifique d'hôtes." }
+];
+
+const COMMANDS = [
+  { cmd:"ping", desc:"Teste la connectivité de bout en bout via ICMP." },
+  { cmd:"ipconfig /all", desc:"Affiche la configuration IP complète (Windows)." },
+  { cmd:"ifconfig", desc:"Affiche la configuration IP (Linux/Unix)." },
+  { cmd:"tracert / traceroute", desc:"Affiche le chemin (sauts) emprunté par un paquet." },
+  { cmd:"nslookup / dig", desc:"Interroge un serveur DNS pour résoudre un nom." },
+  { cmd:"netstat", desc:"Affiche les connexions réseau actives et les ports en écoute." },
+  { cmd:"arp -a", desc:"Affiche la table de correspondance IP <-> MAC locale." }
+];
+
+const IP_CLASSES = [
+  { name:"Classe A", range:"1.0.0.0 à 126.255.255.255", mask:"255.0.0.0 (/8)", type:"Grands réseaux" },
+  { name:"Classe B", range:"128.0.0.0 à 191.255.255.255", mask:"255.255.0.0 (/16)", type:"Réseaux moyens" },
+  { name:"Classe C", range:"192.0.0.0 à 223.255.255.255", mask:"255.255.255.0 (/24)", type:"Petits réseaux" },
+  { name:"Classe D", range:"224.0.0.0 à 239.255.255.255", mask:"N/A", type:"Multicast" },
+  { name:"Classe E", range:"240.0.0.0 à 255.255.255.255", mask:"N/A", type:"Expérimental / Recherche" }
+];
+
+/* =========================================
+   MOTEUR DE GÉNÉRATION (Magie)
+   ========================================= */
+
+let questions = [];
+let userAnswers = {}; // { qID: indexReponse }
+let currentPage = 0;
+const PAGE_SIZE = 10;
+let isFinished = false;
+
+function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+function randInt(max) { return Math.floor(Math.random() * max); }
+
+function generateQuiz() {
+  let qList = [];
+  let id = 1;
+
+  // 1. OSI : Numéro -> Nom (7 questions)
+  LAYERS.forEach(l => {
+    let others = shuffle(LAYERS.filter(x => x.n !== l.n)).slice(0,3).map(x => x.name);
+    qList.push({
+      text: `Quel est le nom de la couche ${l.n} du modèle OSI ?`,
+      opts: shuffle([l.name, ...others]),
+      corr: l.name,
+      expl: `La couche ${l.n} est la couche ${l.name}.`
+    });
+  });
+
+  // 2. OSI : Nom -> Numéro (7 questions)
+  LAYERS.forEach(l => {
+    let others = shuffle(LAYERS.filter(x => x.n !== l.n)).slice(0,3).map(x => "Couche " + x.n);
+    qList.push({
+      text: `Quel est le numéro de la couche "${l.name}" ?`,
+      opts: shuffle([`Couche ${l.n}`, ...others]),
+      corr: `Couche ${l.n}`,
+      expl: `"${l.name}" correspond à la couche numéro ${l.n}.`
+    });
+  });
+
+  // 3. OSI : PDU (Unités de données) (7 questions)
+  LAYERS.forEach(l => {
+    let pduSet = ["Bit", "Trame", "Paquet", "Segment", "Donnée"];
+    let others = shuffle(pduSet.filter(x => x !== l.pdu && !l.pdu.includes(x))).slice(0,3);
+    qList.push({
+      text: `Quelle est l'unité de donnée (PDU) utilisée à la couche ${l.name} ?`,
+      opts: shuffle([l.pdu.split(' ')[0], ...others]), // On prend juste le 1er mot si "Segment / Datagramme"
+      corr: l.pdu.split(' ')[0], // Simplification pour le match
+      expl: `À la couche ${l.name}, l'unité est : ${l.pdu}.`
+    });
+  });
+
+  // 4. OSI : Équipements (7 questions)
+  LAYERS.filter(l => l.n <= 3).forEach(l => {
+    let dev = l.dev.split(',')[0]; // Premier device
+    let others = ["Routeur", "Switch", "Hub", "PC", "Firewall"].filter(d => d !== dev);
+    qList.push({
+      text: `Quel équipement fonctionne principalement au niveau de la couche ${l.name} ?`,
+      opts: shuffle([dev, ...shuffle(others).slice(0,3)]),
+      corr: dev,
+      expl: `Le ${dev} est un équipement de couche ${l.n} (${l.name}).`
+    });
+  });
+
+  // 5. PORTS : Protocole -> Port (29 questions)
+  PORTS.forEach(p => {
+    // Génère des faux ports crédibles (proches)
+    let fake1 = p.p + randInt(10) + 1;
+    let fake2 = Math.max(1, p.p - randInt(5) - 1);
+    let fake3 = 8080;
+    if([fake1, fake2, fake3].includes(p.p)) fake3 = 5555;
+    
+    qList.push({
+      text: `Quel est le numéro de port par défaut pour le protocole **${p.prot}** ?`,
+      opts: shuffle([p.p.toString(), fake1.toString(), fake2.toString(), fake3.toString()]),
+      corr: p.p.toString(),
+      expl: `${p.prot} utilise le port standard ${p.p}.`
+    });
+  });
+
+  // 6. PORTS : Port -> Protocole (29 questions)
+  PORTS.forEach(p => {
+    let others = shuffle(PORTS.filter(x => x.p !== p.p)).slice(0,3).map(x => x.prot);
+    qList.push({
+      text: `À quel service correspond le port **${p.p}** ?`,
+      opts: shuffle([p.prot, ...others]),
+      corr: p.prot,
+      expl: `Le port ${p.p} est réservé à ${p.prot}.`
+    });
+  });
+
+  // 7. PORTS : TCP ou UDP ? (15 questions random)
+  shuffle(PORTS).slice(0, 15).forEach(p => {
+    let type = p.t.includes("TCP") ? "TCP" : "UDP";
+    let wrong = type === "TCP" ? "UDP" : "TCP";
+    qList.push({
+      text: `Le protocole **${p.prot}** (Port ${p.p}) utilise principalement quelle couche transport ?`,
+      opts: ["TCP", "UDP", "ICMP", "IP"],
+      corr: type,
+      expl: `${p.prot} s'appuie généralement sur ${p.t}.`
+    });
+  });
+
+  // 8. DÉFINITIONS (15 questions)
+  DEFINITIONS.forEach(d => {
+    let others = shuffle(DEFINITIONS.filter(x => x.term !== d.term)).slice(0,3).map(x => x.def);
+    qList.push({
+      text: `Quelle est la fonction de **${d.term}** ?`,
+      opts: shuffle([d.def, ...others]),
+      corr: d.def,
+      expl: `${d.term} : ${d.def}`
+    });
+  });
+
+  // 9. COMMANDES (7 questions)
+  COMMANDS.forEach(c => {
+    let others = shuffle(COMMANDS.filter(x => x.cmd !== c.cmd)).slice(0,3).map(x => x.desc);
+    qList.push({
+      text: `Que fait la commande **${c.cmd.split('/')[0]}** ?`,
+      opts: shuffle([c.desc, ...others]),
+      corr: c.desc,
+      expl: `La commande ${c.cmd} ${c.desc.toLowerCase()}`
+    });
+  });
+
+  // 10. CLASSES IP (5 questions)
+  IP_CLASSES.forEach(c => {
+    let others = shuffle(IP_CLASSES.filter(x => x.name !== c.name)).slice(0,3).map(x => x.range);
+    qList.push({
+      text: `Quelle est la plage d'adresses de la **${c.name}** ?`,
+      opts: shuffle([c.range, ...others]),
+      corr: c.range,
+      expl: `La ${c.name} va de ${c.range}.`
+    });
+  });
+
+  // 11. EXTRA QUESTIONS (Vrai/Faux & Divers) - Pour combler et ajouter de la variété
+  const EXTRAS = [
+    { q: "Lequel est une adresse IP Privée de classe C ?", a: "192.168.1.50", bad: ["192.1.1.50", "172.16.0.1", "10.0.0.1"], e: "192.168.x.x est la plage privée de classe C." },
+    { q: "Quelle est la longueur d'une adresse MAC ?", a: "48 bits", bad: ["32 bits", "64 bits", "128 bits"], e: "Une adresse MAC fait 6 octets (6x8 = 48 bits)." },
+    { q: "Quelle est la longueur d'une adresse IPv4 ?", a: "32 bits", bad: ["48 bits", "128 bits", "64 bits"], e: "Une adresse IPv4 fait 4 octets (32 bits)." },
+    { q: "Quelle est la longueur d'une adresse IPv6 ?", a: "128 bits", bad: ["32 bits", "64 bits", "256 bits"], e: "IPv6 utilise 128 bits (hexadécimal)." },
+    { q: "Quel protocole n'est PAS orienté connexion ?", a: "UDP", bad: ["TCP", "SSH", "FTP"], e: "UDP est 'connectionless' (pas d'accusé de réception)." },
+    { q: "Dans une adresse IP 192.168.1.10 /24, quelle partie est l'hôte ?", a: ".10", bad: ["192.168.1", "192.168", ".1.10"], e: "Avec un masque /24 (255.255.255.0), le dernier octet est l'hôte." },
+    { q: "Quel appareil segmente les domaines de collision mais pas de diffusion ?", a: "Switch", bad: ["Hub", "Routeur", "Répéteur"], e: "Le switch crée un domaine de collision par port, mais laisse passer le broadcast." },
+    { q: "Quel appareil segmente les domaines de diffusion (Broadcast) ?", a: "Routeur", bad: ["Switch", "Hub", "Pont"], e: "Seul le routeur bloque les broadcasts par défaut." },
+    { q: "Quel câble est le plus sensible aux interférences électromagnétiques ?", a: "UTP (Non blindé)", bad: ["STP (Blindé)", "Fibre optique", "Coaxial"], e: "L'UTP n'a pas de blindage métallique." },
+    { q: "La fibre optique transmet les données sous forme de...", a: "Lumière", bad: ["Électricité", "Ondes radio", "Son"], e: "La fibre utilise des impulsions lumineuses." }
+  ];
+
+  EXTRAS.forEach(ex => {
+    qList.push({
+      text: ex.q,
+      opts: shuffle([ex.a, ...ex.bad]),
+      corr: ex.a,
+      expl: ex.e
+    });
+  });
+
+  // Mélange final de TOUTES les questions
+  qList = shuffle(qList);
+
+  // Ajout des IDs
+  return qList.map((q, i) => ({ ...q, id: i }));
+}
+
+/* =========================================
+   UI & LOGIQUE
+   ========================================= */
+
+function init() {
+  questions = generateQuiz();
+  // On limite l'affichage à 200 si ça dépasse, pour rester cohérent avec le titre
+  // Mais ici on garde tout car plus y'en a, mieux c'est.
+  renderPage();
+  updateStats();
+}
+
+function renderPage() {
+  const div = document.getElementById('quizContainer');
+  div.innerHTML = "";
+  
+  const start = currentPage * PAGE_SIZE;
+  const end = Math.min(start + PAGE_SIZE, questions.length);
+  const pageQ = questions.slice(start, end);
+
+  pageQ.forEach(q => {
+    const card = document.createElement('div');
+    card.className = "card";
+    
+    // Titre question
+    const h3 = document.createElement('div');
+    h3.className = "question-text";
+    h3.innerHTML = `${q.id + 1}. ${q.text}`;
+    card.appendChild(h3);
+    
+    // Options
+    const optsDiv = document.createElement('div');
+    optsDiv.className = "options";
+    
+    q.opts.forEach((opt, idx) => {
+      // Déterminer la classe CSS (pour la correction)
+      let cssClass = "option-label";
+      let isChecked = (userAnswers[q.id] === opt);
+      
+      if (isFinished) {
+        if (opt === q.corr) cssClass += " correct-answer";
+        else if (isChecked && opt !== q.corr) cssClass += " wrong-answer";
+      }
+
+      const label = document.createElement('label');
+      label.className = cssClass;
+      
+      const radio = document.createElement('input');
+      radio.type = "radio";
+      radio.name = `q_${q.id}`;
+      radio.value = opt;
+      radio.checked = isChecked;
+      if (isFinished) radio.disabled = true;
+      
+      radio.onchange = () => {
+        if (!isFinished) {
+          userAnswers[q.id] = opt;
+          updateStats();
+        }
+      };
+      
+      label.appendChild(radio);
+      label.appendChild(document.createTextNode(opt));
+      optsDiv.appendChild(label);
+    });
+    
+    card.appendChild(optsDiv);
+    
+    // Explication (cachée sauf si fini)
+    const explDiv = document.createElement('div');
+    explDiv.className = "explanation";
+    explDiv.innerHTML = `<strong>Réponse : ${q.corr}</strong><br>${q.expl}`;
+    if (isFinished) explDiv.style.display = "block";
+    
+    card.appendChild(explDiv);
+    div.appendChild(card);
+  });
+
+  // Boutons Nav
+  document.getElementById('btnPrev').disabled = (currentPage === 0);
+  document.getElementById('btnNext').disabled = (end >= questions.length);
+  
+  updateStats();
+  window.scrollTo(0,0);
+}
+
+function movePage(delta) {
+  currentPage += delta;
+  renderPage();
+}
+
+function updateStats() {
+  document.getElementById('lblTotal').innerText = questions.length;
+  document.getElementById('lblPage').innerText = `${currentPage + 1} / ${Math.ceil(questions.length / PAGE_SIZE)}`;
+  
+  if (isFinished) {
+    // Score final déjà calculé
+  } else {
+    const answered = Object.keys(userAnswers).length;
+    document.getElementById('lblScore').innerText = `${answered} rép.`;
+  }
+}
+
+function finishQuiz() {
+  if (!confirm("Voulez-vous vraiment terminer et voir votre note ?")) return;
+  
+  isFinished = true;
+  
+  let score = 0;
+  questions.forEach(q => {
+    if (userAnswers[q.id] === q.corr) score++;
+  });
+  
+  const pct = Math.round((score / questions.length) * 100);
+  
+  // Affiche le panneau de score
+  const p = document.getElementById('scorePanel');
+  p.style.display = "block";
+  p.innerHTML = `<h2>Résultat Final</h2>
+    <span class="score-val">${score} / ${questions.length}</span>
+    <div style="font-size:1.2rem; margin-bottom:10px">${pct}% de réussite</div>
+    <div>${pct > 75 ? "👏 Excellent !" : pct > 50 ? "👍 Pas mal." : "📚 Il faut réviser !"}</div>
+    <button style="margin-top:20px" onclick="location.reload()">Recommencer un nouveau test</button>
+  `;
+  
+  // Cache le bouton terminer, affiche "recommencer" en bas aussi
+  document.getElementById('btnFinish').style.display = "none";
+  
+  renderPage();
+  p.scrollIntoView({ behavior: "smooth" });
+}
+
+// Lancement
+init();
+
+</script>
+</body>
+</html>

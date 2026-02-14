@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Réseau - Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --blue: #3b82f6;
+            --purple: #8b5cf6;
+            --green: #10b981;
+            --orange: #f97316;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin: 0;
+            background: linear-gradient(to right, var(--blue), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p { color: #94a3b8; font-size: 1.2rem; margin-top: 10px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            max-width: 1200px;
+            width: 90%;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 25px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 200px;
+            justify-content: space-between;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.4);
+            border-color: var(--blue);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 4px;
+            background: var(--blue);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+            transform-origin: left;
+        }
+
+        .card:hover::before { transform: scaleX(1); }
+
+        .icon { font-size: 3rem; margin-bottom: 15px; }
+        .title { font-size: 1.5rem; font-weight: bold; margin-bottom: 8px; }
+        .desc { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
+        .arrow { align-self: flex-end; font-weight: bold; opacity: 0; transform: translateX(-10px); transition: 0.3s; }
+        .card:hover .arrow { opacity: 1; transform: translateX(0); }
+
+        /* Couleurs spécifiques */
+        .c-quiz:hover { border-color: var(--green); } .c-quiz::before { background: var(--green); }
+        .c-lab:hover { border-color: var(--orange); } .c-lab::before { background: var(--orange); }
+        .c-term:hover { border-color: var(--purple); } .c-term::before { background: var(--purple); }
+
+        @keyframes fadeIn { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }
+        
+        footer { margin-top: auto; padding: 20px; color: #475569; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🎓 Réseau Master Suite</h1>
+    <p>Ta plateforme d'entraînement complète : Théorie, Pratique & Simulation Powered by Korben.</p>
+</header>
+
+<div class="grid">
+    <a href="cours.html" class="card c-cours">
+        <div>
+            <div class="icon">📚</div>
+            <div class="title">Cours Interactif</div>
+            <div class="desc">Modèle OSI, Ports TCP/UDP et définitions. Une documentation visuelle et dynamique.</div>
+        </div>
+        <span class="arrow">Ouvrir →</span>
+    </a>
+
+    <a href="quiz.html" class="card c-quiz">
+        <div>
+            <div class="icon">⚡</div>
+            <div class="title">QCM Ultimate</div>
+            <div class="desc">Teste tes connaissances avec +200 questions générées aléatoirement. Correction immédiate.</div>
+        </div>
+        <span class="arrow">Lancer le test →</span>
+    </a>
+
+    <a href="labo.html" class="card c-lab">
+        <div>
+            <div class="icon">🧪</div>
+            <div class="title">Labo Réseau & Cisco</div>
+            <div class="desc">Simulateur Cisco IOS, Terminal Bash/PowerShell et entraînements au calcul de sous-réseaux (Subnetting).</div>
+        </div>
+        <span class="arrow">Entrer au Labo →</span>
+    </a>
+
+    <a href="terminal.html" class="card c-term">
+        <div>
+            <div class="icon">💻</div>
+            <div class="title">SimuLab OS</div>
+            <div class="desc">Environnement virtuel Linux & Windows. Installe des paquets, gère des fichiers et des services.</div>
+        </div>
+        <span class="arrow">Démarrer l'OS →</span>
+    </a>
+</div>
+
+<footer>
+    Crée pour l'entraînement personnel - HTML/JS Pur - Aucune installation requise.
+</footer>
+
+</body>
+</html>
