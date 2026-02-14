@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Install Lab - GLPI & Zabbix</title>
+    <style>
+        :root {
+            --bg: #0c0c0c;
+            --term-bg: #1e1e1e;
+            --sidebar: #252526;
+            --text: #cccccc;
+            --green: #4af626;
+            --blue: #3b82f6;
+            --yellow: #facc15;
+            --font: 'Consolas', 'Monaco', monospace;
+        }
+
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* HEADER */
+        header { background: #111; padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; font-size: 1.2rem; color: white; display:flex; align-items:center; gap:10px; }
+        .badge { background: #333; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; color: #aaa; }
+        
+        .home-btn { text-decoration: none; background: #333; color: white; padding: 6px 12px; border-radius: 4px; font-size: 0.9rem; border: 1px solid #555; transition:0.2s; }
+        .home-btn:hover { background: var(--blue); border-color: var(--blue); }
+
+        /* LAYOUT */
+        .main-container { display: flex; flex: 1; height: 100%; }
+
+        /* SIDEBAR (GUIDE) */
+        .sidebar { width: 350px; background: var(--sidebar); border-right: 1px solid #333; display: flex; flex-direction: column; }
+        .scenario-selector { display: flex; border-bottom: 1px solid #444; }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; background: #2d2d2d; color: #888; transition: 0.2s; font-weight: bold; }
+        .tab:hover { color: white; background: #383838; }
+        .tab.active { background: var(--sidebar); color: var(--blue); border-top: 3px solid var(--blue); }
+
+        .guide-content { padding: 20px; overflow-y: auto; flex: 1; }
+        .step-box { background: #333; border-radius: 8px; padding: 15px; margin-bottom: 15px; border-left: 4px solid #555; transition: 0.3s; opacity: 0.5; }
+        .step-box.active { border-left-color: var(--green); opacity: 1; background: #383838; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .step-box.done { border-left-color: var(--blue); opacity: 0.7; }
+        
+        .step-title { font-weight: bold; margin-bottom: 5px; color: white; display: flex; justify-content: space-between; }
+        .step-desc { font-size: 0.9rem; color: #bbb; line-height: 1.4; }
+        .cmd-block { background: #111; padding: 8px; border-radius: 4px; font-family: var(--font); color: var(--green); margin-top: 10px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; border: 1px solid #444; }
+        .copy-btn { background: #444; border: none; color: white; cursor: pointer; padding: 2px 8px; border-radius: 3px; font-size: 0.7rem; }
+        .copy-btn:hover { background: var(--blue); }
+
+        /* TERMINAL */
+        .terminal-wrapper { flex: 1; background: #1e1e1e; padding: 20px; display: flex; flex-direction: column; font-family: var(--font); font-size: 14px; overflow: hidden; position: relative; }
+        .terminal-output { flex: 1; overflow-y: auto; white-space: pre-wrap; color: #ddd; padding-bottom: 10px; }
+        
+        .input-line { display: flex; align-items: center; background: #252526; padding: 10px; border-radius: 6px; border: 1px solid #444; }
+        .prompt { color: var(--green); margin-right: 10px; font-weight: bold; }
+        .prompt.root { color: #f44336; } /* Red for root */
+        .prompt.mysql { color: var(--yellow); } /* Yellow for MySQL */
+        
+        input { background: transparent; border: none; color: white; flex: 1; font-family: inherit; font-size: inherit; outline: none; }
+        
+        /* UTILS */
+        .progress-bar { height: 4px; background: #333; width: 100%; }
+        .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.5s; }
+        
+        .log-info { color: #60a5fa; }
+        .log-warn { color: #facc15; }
+        .log-error { color: #f87171; }
+        .log-success { color: #4ade80; }
+
+        /* Success Overlay */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; display: none; }
+        .overlay h2 { color: var(--green); font-size: 2rem; margin-bottom: 20px; }
+        .overlay button { padding: 10px 20px; font-size: 1rem; cursor: pointer; background: var(--blue); color: white; border: none; border-radius: 5px; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>
+        <span>🐧 Install Lab</span>
+        <span class="badge" id="scenBadge">GLPI</span>
+    </h1>
+    <a href="index.html" class="home-btn">🏠 Accueil</a>
+</header>
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+<div class="main-container">
+    
+    <div class="sidebar">
+        <div class="scenario-selector">
+            <div class="tab active" onclick="loadScenario('glpi')" id="tab-glpi">GLPI (Asset)</div>
+            <div class="tab" onclick="loadScenario('zabbix')" id="tab-zabbix">Zabbix (Monitor)</div>
+        </div>
+        <div class="guide-content" id="guideSteps">
+            </div>
+    </div>
+
+    <div class="terminal-wrapper" onclick="document.getElementById('termInput').focus()">
+        <div class="terminal-output" id="termOutput">
+            <div style="color:#888">Bienvenue sur le serveur Ubuntu 22.04 LTS.</div>
+            <div style="color:#888">Suivez le guide à gauche pour installer vos services.</div>
+            <br>
+        </div>
+        <div class="input-line">
+            <span class="prompt" id="promptStr">root@srv:~#</span>
+            <input type="text" id="termInput" autocomplete="off" spellcheck="false">
+        </div>
+        
+        <div class="overlay" id="successOverlay">
+            <h2>Installation Réussie ! 🎉</h2>
+            <p style="color:#ccc; margin-bottom:30px;">Le service est maintenant accessible via le navigateur.</p>
+            <button onclick="resetLab()">Recommencer / Changer de Lab</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ================= DATA: SCENARIOS ================= */
+
+const scenarios = {
+    glpi: {
+        name: "Installation GLPI 10 (LAMP Stack)",
+        prompt: "root@srv:~#",
+        steps: [
+            {
+                title: "Mise à jour du système",
+                desc: "Toujours commencer par mettre à jour les dépôts avant d'installer quoi que ce soit.",
+                cmd: "apt update && apt upgrade -y",
+                output: "Hit:1 http://fr.archive.ubuntu.com/ubuntu jammy InRelease\nGet:2 http://fr.archive.ubuntu.com/ubuntu jammy-updates InRelease [114 kB]\nFetched 114 kB in 1s (150 kB/s)\nReading package lists... Done\nBuilding dependency tree... Done\n0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."
+            },
+            {
+                title: "Installation dépendances (LAMP)",
+                desc: "GLPI a besoin d'un serveur Web (Apache), de PHP et d'une base de données (MariaDB).",
+                cmd: "apt install apache2 php libapache2-mod-php mariadb-server php-mysqli -y",
+                output: "Reading package lists... Done\nThe following NEW packages will be installed:\n  apache2 mariadb-server php php-common ...\nDo you want to continue? [Y/n] Y\n[####################] 100%\nSetting up apache2...\nSetting up mariadb-server..."
+            },
+            {
+                title: "Connexion à MariaDB",
+                desc: "Connectons-nous pour créer la base de données. Le prompt va changer.",
+                cmd: "mysql -u root -p",
+                output: "Enter password: \nWelcome to the MariaDB monitor.  Commands end with ; or \\g.\nYour MariaDB connection id is 42",
+                newPrompt: "MariaDB [(none)]> ",
+                promptStyle: "mysql"
+            },
+            {
+                title: "Création Base de Données",
+                desc: "Création de la base 'glpi'.",
+                cmd: "CREATE DATABASE glpi;",
+                output: "Query OK, 1 row affected (0.001 sec)"
+            },
+            {
+                title: "Création Utilisateur SQL",
+                desc: "Création de l'utilisateur 'glpi_user' avec le mot de passe 'password'.",
+                cmd: "CREATE USER 'glpi_user'@'localhost' IDENTIFIED BY 'password';",
+                output: "Query OK, 0 rows affected (0.002 sec)"
+            },
+            {
+                title: "Attribution des Droits",
+                desc: "On donne tous les droits sur la base glpi à cet utilisateur.",
+                cmd: "GRANT ALL PRIVILEGES ON glpi.* TO 'glpi_user'@'localhost';",
+                output: "Query OK, 0 rows affected (0.001 sec)"
+            },
+            {
+                title: "Quitter MariaDB",
+                desc: "On retourne au shell système.",
+                cmd: "exit",
+                output: "Bye",
+                newPrompt: "root@srv:~#",
+                promptStyle: "root"
+            },
+            {
+                title: "Téléchargement GLPI",
+                desc: "On récupère l'archive officielle depuis GitHub (version 10.0.7).",
+                cmd: "wget https://github.com/glpi-project/glpi/releases/download/10.0.7/glpi-10.0.7.tgz",
+                output: "--2023-10-24 10:00:00--  https://github.com/.../glpi-10.0.7.tgz\nResolving github.com... 140.82.121.3\nConnecting to github.com|140.82.121.3|:443... connected.\nHTTP request sent, awaiting response... 200 OK\nLength: 12345678 (12M) [application/octet-stream]\nSaving to: 'glpi-10.0.7.tgz'\n\nglpi-10.0.7.tgz     100%[===================>]  12.00M  5.00MB/s    in 2.4s"
+            },
+            {
+                title: "Extraction de l'archive",
+                desc: "On décompresse l'archive.",
+                cmd: "tar -xvf glpi-10.0.7.tgz",
+                output: "glpi/\nglpi/index.php\nglpi/config/\n... (extraction list) ...\nglpi/install/install.php"
+            },
+            {
+                title: "Déplacement vers /var/www",
+                desc: "On déplace le dossier extrait vers la racine du serveur web.",
+                cmd: "mv glpi /var/www/html/",
+                output: ""
+            },
+            {
+                title: "Permissions",
+                desc: "Apache (www-data) doit être propriétaire des fichiers pour écrire dedans.",
+                cmd: "chown -R www-data:www-data /var/www/html/glpi",
+                output: ""
+            }
+        ]
+    },
+    zabbix: {
+        name: "Installation Zabbix 6.0 LTS",
+        prompt: "root@srv:~#",
+        steps: [
+            {
+                title: "Téléchargement du Repository",
+                desc: "Zabbix s'installe via un dépôt officiel spécifique.",
+                cmd: "wget https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.0-4+ubuntu22.04_all.deb",
+                output: "Saving to: 'zabbix-release_6.0-4+ubuntu22.04_all.deb'\n100%[===================>] 3.5K  --.-KB/s    in 0s"
+            },
+            {
+                title: "Installation du Repository",
+                desc: "On installe le paquet .deb téléchargé.",
+                cmd: "dpkg -i zabbix-release_6.0-4+ubuntu22.04_all.deb",
+                output: "Selecting previously unselected package zabbix-release.\n(Reading database ... 25000 files and directories currently installed.)\nUnpacking zabbix-release (6.0-4+ubuntu22.04) ...\nSetting up zabbix-release (6.0-4+ubuntu22.04) ..."
+            },
+            {
+                title: "Mise à jour des dépôts",
+                desc: "On rafraîchit la liste pour inclure les paquets Zabbix.",
+                cmd: "apt update",
+                output: "Hit:1 http://fr.archive.ubuntu.com/ubuntu jammy InRelease\nGet:2 https://repo.zabbix.com/zabbix/6.0/ubuntu jammy InRelease [4945 B]\nFetched 4945 B in 1s\nReading package lists... Done"
+            },
+            {
+                title: "Installation Serveur/Agent",
+                desc: "On installe le serveur Zabbix, l'interface web, l'agent et la conf Apache.",
+                cmd: "apt install zabbix-server-mysql zabbix-frontend-php zabbix-apache-conf zabbix-sql-scripts zabbix-agent -y",
+                output: "The following NEW packages will be installed:\nzabbix-server-mysql zabbix-frontend-php ...\nDo you want to continue? [Y/n] Y\n[####################] 100%\nSetting up zabbix-server-mysql..."
+            },
+            {
+                title: "Connexion SQL",
+                desc: "Connexion pour créer la base.",
+                cmd: "mysql -u root -p",
+                output: "Enter password: \nWelcome to the MariaDB monitor.",
+                newPrompt: "MariaDB [(none)]> ",
+                promptStyle: "mysql"
+            },
+            {
+                title: "Création Base Zabbix",
+                desc: "Création avec encodage utf8mb4 (obligatoire pour Zabbix).",
+                cmd: "create database zabbix character set utf8mb4 collate utf8mb4_bin;",
+                output: "Query OK, 1 row affected (0.00 sec)"
+            },
+            {
+                title: "Création User",
+                desc: "Création de l'utilisateur zabbix.",
+                cmd: "create user zabbix@localhost identified by 'password';",
+                output: "Query OK, 0 rows affected (0.00 sec)"
+            },
+            {
+                title: "Permissions",
+                desc: "Droits totaux pour l'utilisateur zabbix.",
+                cmd: "grant all privileges on zabbix.* to zabbix@localhost;",
+                output: "Query OK, 0 rows affected (0.00 sec)"
+            },
+            {
+                title: "Quitter SQL",
+                desc: "Retour au shell.",
+                cmd: "exit",
+                output: "Bye",
+                newPrompt: "root@srv:~#",
+                promptStyle: "root"
+            },
+            {
+                title: "Import Schéma Initial",
+                desc: "Zabbix a besoin de ses tables. On importe le script fourni. (Cela prend du temps normalement).",
+                cmd: "zcat /usr/share/doc/zabbix-sql-scripts/mysql/server.sql.gz | mysql -uzabbix -p zabbix",
+                output: "Enter password: \n(Importing data... please wait...)\nDone."
+            },
+            {
+                title: "Redémarrage Services",
+                desc: "On lance le serveur Zabbix, l'agent et on redémarre Apache.",
+                cmd: "systemctl restart zabbix-server zabbix-agent apache2",
+                output: ""
+            },
+            {
+                title: "Enable Services",
+                desc: "Pour qu'ils démarrent au boot.",
+                cmd: "systemctl enable zabbix-server zabbix-agent apache2",
+                output: "Created symlink /etc/systemd/system/multi-user.target.wants/zabbix-server.service..."
+            }
+        ]
+    }
+};
+
+/* ================= LOGIC ================= */
+
+let currentScenario = null;
+let currentStepIndex = 0;
+
+function loadScenario(key) {
+    currentScenario = scenarios[key];
+    currentStepIndex = 0;
+    
+    // UI Updates
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + key).classList.add('active');
+    document.getElementById('scenBadge').innerText = key.toUpperCase();
+    document.getElementById('successOverlay').style.display = 'none';
+    
+    // Prompt Reset
+    document.getElementById('promptStr').innerText = currentScenario.prompt;
+    document.getElementById('promptStr').className = "prompt root";
+
+    // Clear Terminal
+    document.getElementById('termOutput').innerHTML = `<div style="color:#aaa">--- Début Scénario : ${currentScenario.name} ---</div><br>`;
+    
+    renderSidebar();
+    updateProgress();
+}
+
+function renderSidebar() {
+    const container = document.getElementById('guideSteps');
+    container.innerHTML = '';
+    
+    currentScenario.steps.forEach((step, index) => {
+        const div = document.createElement('div');
+        div.className = `step-box ${index === currentStepIndex ? 'active' : ''} ${index < currentStepIndex ? 'done' : ''}`;
+        div.id = `step-${index}`;
+        
+        div.innerHTML = `
+            <div class="step-title">
+                <span>${index + 1}. ${step.title}</span>
+                ${index < currentStepIndex ? '✅' : ''}
+            </div>
+            <div class="step-desc">${step.desc}</div>
+            <div class="cmd-block">
+                <span>${step.cmd}</span>
+                <button class="copy-btn" onclick="fillInput('${step.cmd.replace(/'/g, "\\'")}')">Coller</button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+    
+    // Scroll active step into view
+    const active = document.getElementById(`step-${currentStepIndex}`);
+    if(active) active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function fillInput(text) {
+    const input = document.getElementById('termInput');
+    input.value = text;
+    input.focus();
+}
+
+function handleCommand(cmd) {
+    const termOut = document.getElementById('termOutput');
+    const step = currentScenario.steps[currentStepIndex];
+    const promptTxt = document.getElementById('promptStr').innerText;
+
+    // Echo command
+    termOut.innerHTML += `<div><span class="${document.getElementById('promptStr').className}">${promptTxt}</span> ${cmd}</div>`;
+
+    if(!step) return;
+
+    // Check command (Clean spaces and simple fuzzy match)
+    const cleanCmd = cmd.trim();
+    const expected = step.cmd.trim();
+    
+    // Allow slight variations (like forgetting -y or spaces)
+    const isCorrect = cleanCmd === expected || (expected.includes(cleanCmd) && cleanCmd.length > expected.length * 0.8);
+
+    if (isCorrect) {
+        // Show output
+        if (step.output) {
+            termOut.innerHTML += `<div class="log-info">${step.output}</div>`;
+        }
+        
+        // Handle Prompt Change (MySQL vs Root)
+        if (step.newPrompt) {
+            document.getElementById('promptStr').innerText = step.newPrompt;
+            document.getElementById('promptStr').className = "prompt " + (step.promptStyle || "root");
+        }
+
+        currentStepIndex++;
+        updateProgress();
+        renderSidebar(); // Refresh sidebar state
+
+        // Check Finish
+        if (currentStepIndex >= currentScenario.steps.length) {
+            setTimeout(() => {
+                document.getElementById('successOverlay').style.display = 'flex';
+            }, 1000);
+        }
+    } else {
+        termOut.innerHTML += `<div class="log-error">Commande incorrecte. Attendu : ${expected}</div>`;
+        termOut.innerHTML += `<div class="log-warn">Conseil : Utilisez le bouton 'Coller' si c'est trop long.</div>`;
+    }
+
+    // Scroll bottom
+    termOut.scrollTop = termOut.scrollHeight;
+}
+
+function updateProgress() {
+    const pct = (currentStepIndex / currentScenario.steps.length) * 100;
+    document.getElementById('progress').style.width = pct + "%";
+}
+
+function resetLab() {
+    loadScenario(currentScenario === scenarios.glpi ? 'glpi' : 'zabbix');
+}
+
+// Event Listener Input
+document.getElementById('termInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        const val = this.value;
+        this.value = '';
+        handleCommand(val);
+    }
+});
+
+// Init Default
+loadScenario('glpi');
+
+</script>
+</body>
+</html>
