@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>TopoBuilder - Simulateur Réseau</title>
+    <style>
+        :root { --bg: #0f172a; --panel: #1e293b; --accent: #3b82f6; --text: #e2e8f0; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* HEADER */
+        header { background: #111; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        h1 { margin: 0; font-size: 1.2rem; background: linear-gradient(90deg, #3b82f6, #22c55e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        /* TOOLBAR */
+        .toolbar { background: var(--panel); padding: 10px; display: flex; gap: 10px; border-bottom: 1px solid #333; }
+        .tool-btn { background: #334155; border: 1px solid #475569; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .tool-btn:hover { background: var(--accent); }
+        .tool-btn.active { background: var(--accent); border-color: white; box-shadow: 0 0 10px var(--accent); }
+        .separator { width: 1px; background: #475569; margin: 0 10px; }
+
+        /* WORKSPACE */
+        .workspace { flex: 1; position: relative; background-image: radial-gradient(#334155 1px, transparent 1px); background-size: 20px 20px; overflow: hidden; cursor: crosshair; }
+        
+        /* DEVICES (NODES) */
+        .node { position: absolute; width: 60px; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: grab; z-index: 10; user-select: none; }
+        .node-icon { width: 40px; height: 40px; background: #0f172a; border: 2px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: 0.2s; }
+        .node:hover .node-icon { border-color: var(--accent); transform: scale(1.1); }
+        .node-label { background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-top: 4px; white-space: nowrap; }
+        .node.selected .node-icon { border-color: #f59e0b; box-shadow: 0 0 15px #f59e0b; }
+
+        /* CABLES (SVG) */
+        svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        line { stroke: #64748b; stroke-width: 3; transition: stroke 0.3s; }
+        line.active { stroke: #22c55e; stroke-width: 4; }
+
+        /* PANELS */
+        .panel { position: absolute; right: 20px; top: 80px; width: 250px; background: var(--panel); border: 1px solid #475569; border-radius: 8px; padding: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: none; z-index: 20; }
+        .panel h3 { margin-top: 0; border-bottom: 1px solid #475569; padding-bottom: 10px; color: var(--accent); }
+        .prop-row { margin-bottom: 10px; }
+        .prop-row label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
+        .prop-row input { width: 100%; background: #0f172a; border: 1px solid #475569; color: white; padding: 6px; border-radius: 4px; box-sizing: border-box; }
+        
+        /* LOG CONSOLE */
+        .console { position: absolute; bottom: 0; left: 0; width: 100%; height: 150px; background: #000; border-top: 2px solid #333; overflow-y: auto; font-family: monospace; padding: 10px; box-sizing: border-box; font-size: 13px; z-index: 30; }
+        .log-success { color: #4ade80; }
+        .log-error { color: #f87171; }
+        .log-info { color: #60a5fa; }
+
+        /* Home Button */
+        .home-btn { text-decoration: none; color: white; background: #333; padding: 5px 10px; border-radius: 4px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <h1>🌐 TopoBuilder</h1>
+        <span style="font-size:0.8rem; color:#94a3b8;">v1.0</span>
+    </div>
+    <a href="index.html" class="home-btn">🏠 Accueil</a>
+</header>
+
+<div class="toolbar">
+    <button class="tool-btn active" id="btnSelect" onclick="setMode('select')">👆 Sélection</button>
+    <button class="tool-btn" id="btnCable" onclick="setMode('cable')">⚡ Câble</button>
+    <button class="tool-btn" onclick="deleteSelected()">🗑️ Supprimer</button>
+    
+    <div class="separator"></div>
+    
+    <button class="tool-btn" onclick="addDevice('router')">⊗ Routeur</button>
+    <button class="tool-btn" onclick="addDevice('switch')">▧ Switch</button>
+    <button class="tool-btn" onclick="addDevice('pc')">💻 PC</button>
+    
+    <div class="separator"></div>
+
+    <button class="tool-btn" onclick="autoTopo('star')">★ Étoile</button>
+    <button class="tool-btn" onclick="autoTopo('bus')">━ Bus</button>
+    
+    <div class="separator"></div>
+    
+    <button class="tool-btn" style="background:#059669; border-color:#059669;" onclick="startPing()">🚀 Simulation PING</button>
+</div>
+
+<div class="workspace" id="workspace" onmousedown="handleMouseDown(event)" onmousemove="handleMouseMove(event)" onmouseup="handleMouseUp(event)">
+    <svg id="cablesLayer"></svg>
+    <div id="nodesLayer"></div>
+</div>
+
+<div class="panel" id="configPanel">
+    <h3>Configuration</h3>
+    <div class="prop-row">
+        <label>Nom</label>
+        <input type="text" id="confName" oninput="updateDevice()">
+    </div>
+    <div id="pcProps">
+        <div class="prop-row">
+            <label>Adresse IP</label>
+            <input type="text" id="confIP" oninput="updateDevice()">
+        </div>
+        <div class="prop-row">
+            <label>VLAN ID</label>
+            <input type="number" id="confVlan" oninput="updateDevice()">
+        </div>
+        <div class="prop-row">
+            <label>Gateway</label>
+            <input type="text" id="confGw" oninput="updateDevice()">
+        </div>
+    </div>
+    <button style="width:100%; padding:8px; background:#ef4444; border:none; color:white; border-radius:4px; cursor:pointer; margin-top:10px;" onclick="closePanel()">Fermer</button>
+</div>
+
+<div class="console" id="console">
+    <div style="color:#666">Bienvenue dans TopoBuilder. Ajoutez des équipements pour commencer.</div>
+</div>
+
+<script>
+/* ================= STATE ================= */
+let devices = [];
+let cables = [];
+let mode = 'select'; // select, cable
+let selectedId = null;
+let draggingId = null;
+let cableStartId = null;
+let idCounter = 1;
+
+/* ================= CORE FUNCTIONS ================= */
+
+function log(msg, type='info') {
+    const c = document.getElementById('console');
+    const d = document.createElement('div');
+    d.innerHTML = `> ${msg}`;
+    d.className = `log-${type}`;
+    c.appendChild(d);
+    c.scrollTop = c.scrollHeight;
+}
+
+function setMode(m) {
+    mode = m;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(m === 'select' ? 'btnSelect' : 'btnCable').classList.add('active');
+    cableStartId = null;
+    log(`Mode changé : ${m.toUpperCase()}`);
+}
+
+function addDevice(type, x = 100, y = 100) {
+    const dev = {
+        id: idCounter++,
+        type: type,
+        x: x,
+        y: y,
+        name: `${type.toUpperCase()}_${idCounter}`,
+        ip: type === 'pc' ? `192.168.1.${idCounter}` : '',
+        vlan: 1,
+        gw: '192.168.1.254'
+    };
+    devices.push(dev);
+    renderDevices();
+    log(`Ajouté : ${dev.name}`);
+    return dev; // return for auto generators
+}
+
+function deleteSelected() {
+    if(!selectedId) return;
+    devices = devices.filter(d => d.id !== selectedId);
+    cables = cables.filter(c => c.a !== selectedId && c.b !== selectedId);
+    selectedId = null;
+    closePanel();
+    renderDevices();
+    renderCables();
+    log("Élément supprimé.", "error");
+}
+
+/* ================= RENDERING ================= */
+
+function renderDevices() {
+    const layer = document.getElementById('nodesLayer');
+    layer.innerHTML = '';
+    
+    devices.forEach(d => {
+        const el = document.createElement('div');
+        el.className = `node ${selectedId === d.id ? 'selected' : ''}`;
+        el.style.left = d.x + 'px';
+        el.style.top = d.y + 'px';
+        el.dataset.id = d.id;
+        
+        let icon = '?';
+        if(d.type === 'router') icon = '⊗';
+        if(d.type === 'switch') icon = '▧';
+        if(d.type === 'pc') icon = '💻';
+        
+        // Show VLAN tag for PCs
+        let extra = '';
+        if(d.type === 'pc') extra = `<span style="color:#fbbf24; font-size:9px;">VLAN ${d.vlan}</span>`;
+
+        el.innerHTML = `
+            <div class="node-icon">${icon}</div>
+            <div class="node-label">${d.name}</div>
+            ${extra}
+        `;
+        layer.appendChild(el);
+    });
+}
+
+function renderCables() {
+    const svg = document.getElementById('cablesLayer');
+    svg.innerHTML = '';
+    
+    cables.forEach(c => {
+        const dA = devices.find(d => d.id === c.a);
+        const dB = devices.find(d => d.id === c.b);
+        if(!dA || !dB) return;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        // Offset +30 to center in 60x60 node
+        line.setAttribute('x1', dA.x + 30);
+        line.setAttribute('y1', dA.y + 30);
+        line.setAttribute('x2', dB.x + 30);
+        line.setAttribute('y2', dB.y + 30);
+        svg.appendChild(line);
+    });
+}
+
+/* ================= MOUSE EVENTS ================= */
+
+function handleMouseDown(e) {
+    const target = e.target.closest('.node');
+    if(!target) {
+        // Click on empty space -> deselect
+        selectedId = null;
+        closePanel();
+        renderDevices();
+        return;
+    }
+
+    const id = parseInt(target.dataset.id);
+    const device = devices.find(d => d.id === id);
+
+    if(mode === 'select') {
+        selectedId = id;
+        draggingId = id;
+        openPanel(device);
+        renderDevices();
+    } else if (mode === 'cable') {
+        if(!cableStartId) {
+            cableStartId = id;
+            log(`Câble: Départ ${device.name}... Choisissez la destination.`);
+            target.classList.add('selected'); // Visual feedback
+        } else {
+            if(cableStartId !== id) {
+                // Check dupes
+                const exists = cables.find(c => (c.a === cableStartId && c.b === id) || (c.a === id && c.b === cableStartId));
+                if(!exists) {
+                    cables.push({ a: cableStartId, b: id });
+                    renderCables();
+                    log(`Connexion établie entre ${cableStartId} et ${id}`, "success");
+                }
+            }
+            cableStartId = null;
+            renderDevices(); // remove selection
+        }
+    }
+}
+
+function handleMouseMove(e) {
+    if(draggingId && mode === 'select') {
+        const device = devices.find(d => d.id === draggingId);
+        device.x = e.clientX - 30; // Center offset
+        device.y = e.clientY - 90; // Header/Toolbar offset approx
+        // Boundaries
+        if(device.x < 0) device.x = 0;
+        if(device.y < 0) device.y = 0;
+        
+        renderDevices();
+        renderCables();
+    }
+}
+
+function handleMouseUp(e) {
+    draggingId = null;
+}
+
+/* ================= PROPERTIES PANEL ================= */
+
+function openPanel(d) {
+    const p = document.getElementById('configPanel');
+    const pcProps = document.getElementById('pcProps');
+    
+    document.getElementById('confName').value = d.name;
+    
+    if(d.type === 'pc') {
+        pcProps.style.display = 'block';
+        document.getElementById('confIP').value = d.ip;
+        document.getElementById('confVlan').value = d.vlan;
+        document.getElementById('confGw').value = d.gw;
+    } else {
+        pcProps.style.display = 'none';
+    }
+    
+    p.style.display = 'block';
+}
+
+function closePanel() {
+    document.getElementById('configPanel').style.display = 'none';
+}
+
+function updateDevice() {
+    if(!selectedId) return;
+    const d = devices.find(dev => dev.id === selectedId);
+    d.name = document.getElementById('confName').value;
+    if(d.type === 'pc') {
+        d.ip = document.getElementById('confIP').value;
+        d.vlan = parseInt(document.getElementById('confVlan').value);
+        d.gw = document.getElementById('confGw').value;
+    }
+    renderDevices();
+}
+
+/* ================= SIMULATION LOGIC (THE BRAIN) ================= */
+
+let pingStep1 = null;
+
+function startPing() {
+    log("MODE PING: Cliquez sur le PC Source...", "info");
+    setMode('select'); // Force select mode logic but intercept clicks
+    
+    // Override click handler temporarily or just use a flag
+    // Simple way: Add global listener
+    document.body.style.cursor = "help";
+    
+    const handler = (e) => {
+        const target = e.target.closest('.node');
+        if(!target) return;
+        const id = parseInt(target.dataset.id);
+        const dev = devices.find(d => d.id === id);
+        
+        if(dev.type !== 'pc') {
+            log("Erreur: Le ping doit partir d'un PC.", "error");
+            return;
+        }
+
+        if(!pingStep1) {
+            pingStep1 = dev;
+            log(`Source: ${dev.name} (${dev.ip}). Cliquez sur la destination...`, "info");
+            target.querySelector('.node-icon').style.borderColor = '#22c55e';
+        } else {
+            const source = pingStep1;
+            const dest = dev;
+            
+            // Clean up
+            document.body.removeEventListener('click', handler, true);
+            document.body.style.cursor = "default";
+            pingStep1 = null;
+            renderDevices(); // Reset styles
+            
+            runPingSimulation(source, dest);
+        }
+        e.stopImmediatePropagation();
+    };
+    
+    document.body.addEventListener('click', handler, {capture:true, once:false});
+    // Remove listener after 2 clicks is tricky here, so we reload page logic sort of.
+    // Hack: remove listener after second click inside the function.
+}
+
+function runPingSimulation(src, dst) {
+    log(`-----------------------------------`);
+    log(`PING ${src.ip} > ${dst.ip}`, "info");
+
+    // 1. Check Connectivity (BFS)
+    const path = findPath(src.id, dst.id);
+    
+    if(!path) {
+        log("❌ ECHEC: Pas de câble connecté.", "error");
+        return;
+    }
+
+    log(`✅ Câblage OK. Chemin: ${path.map(id => devices.find(d=>d.id===id).name).join(' -> ')}`);
+
+    // 2. Check Logic (Layer 2 & 3)
+    // Simple logic:
+    // Are they in the same VLAN?
+    if(src.vlan === dst.vlan) {
+        // Same VLAN. Check IP Subnet (Simplification: assumes /24)
+        const srcNet = src.ip.substring(0, src.ip.lastIndexOf('.'));
+        const dstNet = dst.ip.substring(0, dst.ip.lastIndexOf('.'));
+        
+        if(srcNet === dstNet) {
+            log(`✅ Même VLAN (${src.vlan}) et même Sous-réseau.`, "success");
+            log(`🚀 Reply from ${dst.ip}: bytes=32 time=1ms TTL=128`, "success");
+        } else {
+            log(`❌ ECHEC: Même VLAN mais IPs dans réseaux différents sans passerelle.`, "error");
+        }
+    } else {
+        // Different VLAN. Need a Router in the path?
+        const hasRouter = path.some(id => devices.find(d => d.id === id).type === 'router');
+        
+        if(hasRouter) {
+            log(`⚠️ VLANs différents (${src.vlan} vs ${dst.vlan}). Routeur détecté dans le chemin.`, "info");
+            log(`✅ Routage Inter-VLAN réussi (Simulation).`, "success");
+            log(`🚀 Reply from ${dst.ip}: bytes=32 time=5ms TTL=127`, "success");
+        } else {
+            log(`❌ ECHEC: VLANs différents (${src.vlan} vs ${dst.vlan}) et PAS de routeur.`, "error");
+            log(`Le switch bloque le trafic entre VLANs.`, "error");
+        }
+    }
+}
+
+// Breadth First Search to find if connected
+function findPath(startId, endId) {
+    let queue = [[startId]];
+    let visited = new Set();
+    visited.add(startId);
+    
+    while(queue.length > 0) {
+        let path = queue.shift();
+        let node = path[path.length - 1];
+        
+        if(node === endId) return path;
+        
+        // Find neighbors
+        let neighbors = [];
+        cables.forEach(c => {
+            if(c.a === node && !visited.has(c.b)) neighbors.push(c.b);
+            if(c.b === node && !visited.has(c.a)) neighbors.push(c.a);
+        });
+        
+        for(let neighbor of neighbors) {
+            visited.add(neighbor);
+            let newPath = [...path, neighbor];
+            queue.push(newPath);
+        }
+    }
+    return null;
+}
+
+/* ================= AUTO GENERATORS ================= */
+
+function autoTopo(type) {
+    devices = []; cables = []; idCounter = 1; // Clear
+    
+    if(type === 'star') {
+        log("Génération Topologie Étoile...");
+        const sw = addDevice('switch', 400, 300);
+        const r = addDevice('router', 400, 100);
+        cables.push({a: sw.id, b: r.id});
+        
+        const positions = [[200, 450], [400, 500], [600, 450]];
+        positions.forEach((pos, idx) => {
+            const pc = addDevice('pc', pos[0], pos[1]);
+            pc.vlan = idx === 0 ? 10 : 20; // Example VLANs
+            pc.name = `PC_VLAN${pc.vlan}`;
+            cables.push({a: sw.id, b: pc.id});
+        });
+        log("Astuce: PC 1 est VLAN 10, PC 2 est VLAN 20. Essayez le Ping !");
+    }
+    
+    if(type === 'bus') {
+        log("Génération Topologie Bus (obsolète mais éducatif)...");
+        let prev = null;
+        for(let i=0; i<4; i++) {
+            const hub = addDevice('switch', 200 + (i*150), 300); // Using switch as visual placeholder for hub
+            hub.name = "Hub_Segment";
+            const pc = addDevice('pc', 200 + (i*150), 450);
+            cables.push({a: hub.id, b: pc.id});
+            
+            if(prev) cables.push({a: prev.id, b: hub.id});
+            prev = hub;
+        }
+    }
+    
+    renderDevices();
+    renderCables();
+}
+
+// Start empty
+log("Prêt.");
+
+</script>
+</body>
+</html>
